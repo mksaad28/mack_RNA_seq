@@ -16,3 +16,13 @@ This project has three main investigations from the data analysis.
 --> Differential expresssion between proliferation/serum-starvation
 --> Regular expression to identify receptors upregulated in proliferation
 --> Literature and vendor search for ligands to hit the receptors and thus test in SFM
+
+
+# Rules for project participants
+Comment code abundantly. Label code at the top with the main purpose. Write loading directories here. Include sample sizes (n = ... # of genes, samples)
+
+Name variables with underscores ("_"). It is best to start with a base name for a variable type and add on from there. Example: df_fat_sig
+
+Clearly label functions with input, output, associated data types for inputs/outputs, and a short description of what the function does.
+
+
