@@ -5,16 +5,24 @@ This project has three main investigations from the data analysis.
 
 # Investigation 1: What allowed for Mack1 cells to grow out from spontaneous immortalization crisis?
 --> eSNP-karyotyping
+
 --> Differential expression between pre- and post-crisis cells' RNA
+
 --> Pathway enrichment analysis
+
 --> Cross-reference with literature
+
 # Investigation 2: What gene expression changes link phenotype to genotype?
 --> Differential expression between adipogenic-like/proliferation, serum starvation/proliferation, serum starvation/serum reduction
+
 --> Pathway enrichment analysis
+
 --> Cross-reference with literature
 # Investigation 3: What receptors are upregulated during growth and can we find ligands to aid in serum-free media (SFM) development?
 --> Differential expresssion between proliferation/serum-starvation
+
 --> Regular expression to identify receptors upregulated in proliferation
+
 --> Literature and vendor search for ligands to hit the receptors and thus test in SFM
 
 
