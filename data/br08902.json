@@ -1,0 +1,173 @@
+	[
+	{
+			"name":"Protein families: metabolism",
+			"children":[
+			{
+				"name":"ko01000  Enzymes"
+			},
+			{
+				"name":"ko01001  Protein kinases"
+			},
+			{
+				"name":"ko01009  Protein phosphatases and associated proteins"
+			},
+			{
+				"name":"ko01002  Peptidases and inhibitors"
+			},
+			{
+				"name":"ko01003  Glycosyltransferases"
+			},
+			{
+				"name":"ko01005  Lipopolysaccharide biosynthesis proteins"
+			},
+			{
+				"name":"ko01011  Peptidoglycan biosynthesis and degradation proteins"
+			},
+			{
+				"name":"ko01004  Lipid biosynthesis proteins"
+			},
+			{
+				"name":"ko01008  Polyketide biosynthesis proteins"
+			},
+			{
+				"name":"ko01006  Prenyltransferases"
+			},
+			{
+				"name":"ko01007  Amino acid related enzymes"
+			},
+			{
+				"name":"ko00199  Cytochrome P450"
+			},
+			{
+				"name":"ko00194  Photosynthesis proteins"
+			}
+			]
+		},
+		{
+			"name":"Protein families: genetic information processing",
+			"children":[
+			{
+				"name":"ko03000  Transcription factors"
+			},
+			{
+				"name":"ko03021  Transcription machinery"
+			},
+			{
+				"name":"ko03019  Messenger RNA biogenesis"
+			},
+			{
+				"name":"ko03041  Spliceosome"
+			},
+			{
+				"name":"ko03011  Ribosome"
+			},
+			{
+				"name":"ko03009  Ribosome biogenesis"
+			},
+			{
+				"name":"ko03016  Transfer RNA biogenesis"
+			},
+			{
+				"name":"ko03012  Translation factors"
+			},
+			{
+				"name":"ko03110  Chaperones and folding catalysts"
+			},
+			{
+				"name":"ko04131  Membrane trafficking"
+			},
+			{
+				"name":"ko04121  Ubiquitin system"
+			},
+			{
+				"name":"ko03051  Proteasome"
+			},
+			{
+				"name":"ko03032  DNA replication proteins"
+			},
+			{
+				"name":"ko03036  Chromosome and associated proteins"
+			},
+			{
+				"name":"ko03400  DNA repair and recombination proteins"
+			},
+			{
+				"name":"ko03029  Mitochondrial biogenesis"
+			}
+			]
+		},
+		{
+			"name":"Protein families: signaling and cellular processes",
+			"children":[
+			{
+				"name":"ko02000  Transporters"
+			},
+			{
+				"name":"ko02044  Secretion system"
+			},
+			{
+				"name":"ko02042  Bacterial toxins"
+			},
+			{
+				"name":"ko02022  Two-component system"
+			},
+			{
+				"name":"ko02035  Bacterial motility proteins"
+			},
+			{
+				"name":"ko04812  Cytoskeleton proteins"
+			},
+			{
+				"name":"ko04147  Exosome"
+			},
+			{
+				"name":"ko02048  Prokaryotic defense system"
+			},
+			{
+				"name":"ko04030  G protein-coupled receptors"
+			},
+			{
+				"name":"ko04050  Cytokine receptors"
+			},
+			{
+				"name":"ko04054  Pattern recognition receptors"
+			},
+			{
+				"name":"ko03310  Nuclear receptors"
+			},
+			{
+				"name":"ko04040  Ion channels"
+			},
+			{
+				"name":"ko04031  GTP-binding proteins"
+			},
+			{
+				"name":"ko04052  Cytokines and growth factors"
+			},
+			{
+				"name":"ko04515  Cell adhesion molecules"
+			},
+			{
+				"name":"ko04090  CD molecules"
+			},
+			{
+				"name":"ko01504  Antimicrobial resistance genes"
+			},
+			{
+				"name":"ko00535  Proteoglycans"
+			},
+			{
+				"name":"ko00536  Glycosaminoglycan binding proteins"
+			},
+			{
+				"name":"ko00537  Glycosylphosphatidylinositol (GPI)-anchored proteins"
+			},
+			{
+				"name":"ko04091  Lectins"
+			},
+			{
+				"name":"ko04990  Domain-containing proteins not elsewhere classified"
+			}
+			]
+		}
+	]
