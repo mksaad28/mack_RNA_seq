@@ -52,6 +52,8 @@ genes_and_brite <- eggnogg |>
   mutate(brite = str_split(brite, ",")) |>
   unnest(cols = c(brite))
 
+term_to_brite <- genes_and_brite[c('brite','gene_id')]
+
 ## get gene ontologies out of eggnogg.
 term_to_gene <- eggnogg |>
   select(gene_id, GOs) |>
@@ -255,21 +257,33 @@ do_without_interaction <- function(filename) {
     select(Term, Ontology, ratio, pvalue, p.adjust, qvalue, everything()) |>
     relocate(geneID, .after = last_col())
 
-  write_to_db(
-    filename = filename,
-    data_long = expr_long_cpm |> left_join(sample_lookup, by = "sample") |> left_join(gene_lookup, by = "gene_id") |> mutate(gene_name = gene_id),
-    int_limma_res = expr_limma_res,
-    kegg_categories = kegg_categories,
-    genes_and_brite = genes_and_brite,
-    int_enricher_res_tbl = enricher_res_tbl,
-    pca_expr = pca_expr
+  ## KEGG
+  kegg_obj <- enricher(
+    gene = expr_limma_res |> filter(adj.P.Val < 0.05) |> pull(gene_id),
+    universe = expr_limma_res |> pull(gene_id),
+    TERM2GENE = term_to_brite
   )
+  # enricher: A universal enrichment analyzer
+  # genes are signficant genes, universe is all genes. Later used for Fisher's exact test?
+  
+  kegg_res_tbl <- kegg_obj@result |> 
+    as_tibble() |>
+    inner_join(kegg_categories, by = c("ID" = "brite")) |>
+    rowwise() |>
+    mutate(ratio = eval(parse(text = GeneRatio)) / eval(parse(text = BgRatio))) |>
+    select(-Description) |>
+    select(category, ratio, pvalue, p.adjust, qvalue, everything()) |>
+    relocate(geneID, .after = last_col())
+  
+  write.csv(expr_limma_res, paste("output/dataframes/df",filename,"genes.csv",sep = "_"))
+  write.csv(enricher_res_tbl, paste("output/dataframes/df",filename,"pathways.csv",sep = "_"))
+  write.csv(kegg_res_tbl, paste("output/dataframes/df",filename,"kegg.csv",sep = "_"))
+
+  
 }
 
 
-without_interaction <- do_without_interaction(filename = "output/p77_vs_p27_nointeraction.sqlite")
-
-
+without_interaction <- do_without_interaction(filename = "wo_int")
 
 
 
@@ -350,36 +364,50 @@ do_interaction_analysis <- function(reference_protocol, filename) {
     left_join(gene_lookup, by = "gene_id") |>
     mutate(gene_name = gene_id)
 
-  write_to_db(filename,
-    data_long = data_long,
-    int_limma_res = int_limma_res,
-    kegg_categories = kegg_categories,
-    genes_and_brite = genes_and_brite,
-    int_enricher_res_tbl = int_enricher_res_tbl,
-    pca_expr = pca_expr
+  ## KEGG
+  kegg_obj <- enricher(
+    gene = int_limma_res |> filter(adj.P.Val < 0.05) |> pull(gene_id),
+    universe = int_limma_res |> pull(gene_id),
+    TERM2GENE = term_to_brite
   )
+  # enricher: A universal enrichment analyzer
+  # genes are signficant genes, universe is all genes. Later used for Fisher's exact test?
+  
+  kegg_res_tbl <- kegg_obj@result |> 
+    as_tibble() |>
+    inner_join(kegg_categories, by = c("ID" = "brite")) |>
+    rowwise() |>
+    mutate(ratio = eval(parse(text = GeneRatio)) / eval(parse(text = BgRatio))) |>
+    select(-Description) |>
+    select(category, ratio, pvalue, p.adjust, qvalue, everything()) |>
+    relocate(geneID, .after = last_col())
+  
+  write.csv(int_limma_res, paste("output/dataframes/df",filename,"genes.csv",sep = "_"))
+  write.csv(int_enricher_res_tbl, paste("output/dataframes/df",filename,"pathways.csv",sep = "_"))
+  write.csv(kegg_res_tbl, paste("output/dataframes/df",filename,"kegg.csv",sep = "_"))
+  
 }
 
 
 # Call, run, and write limma with interactions ----------------------
 interaction_f <- do_interaction_analysis(
   reference_protocol = "f",
-  filename = "output/p77_vs_p27_protocol_f.sqlite"
+  filename = "f"
 )
 
 interaction_m <- do_interaction_analysis(
   reference_protocol = "m",
-  filename = "output/p77_vs_p27_protocol_m.sqlite"
+  filename = "m"
 )
 
 interaction_p <- do_interaction_analysis(
   reference_protocol = "p",
-  filename = "output/p77_vs_p27_protocol_p.sqlite"
+  filename = "p"
 )
 
 interaction_s <- do_interaction_analysis(
   reference_protocol = "s",
-  filename = "output/p77_vs_p27_protocol_s.sqlite"
+  filename = "s"
 )
 
 
@@ -453,15 +481,33 @@ do_medium_analysis <- function(filename, reference_passage) {
     left_join(gene_lookup, by = "gene_id") |>
     mutate(gene_name = gene_id)
 
-  write_to_db(filename,
-    data_long = data_long,
-    int_limma_res = int_limma_res,
-    kegg_categories = kegg_categories,
-    genes_and_brite = genes_and_brite,
-    int_enricher_res_tbl = int_enricher_res_tbl,
-    pca_expr = pca_expr
+  
+  ## KEGG
+  kegg_obj <- enricher(
+    gene = int_limma_res |> filter(adj.P.Val < 0.05) |> pull(gene_id),
+    universe = int_limma_res |> pull(gene_id),
+    TERM2GENE = term_to_brite
   )
+  # enricher: A universal enrichment analyzer
+  # genes are signficant genes, universe is all genes. Later used for Fisher's exact test?
+  
+  kegg_res_tbl <- kegg_obj@result |> 
+    as_tibble() |>
+    inner_join(kegg_categories, by = c("ID" = "brite")) |>
+    rowwise() |>
+    mutate(ratio = eval(parse(text = GeneRatio)) / eval(parse(text = BgRatio))) |>
+    select(-Description) |>
+    select(category, ratio, pvalue, p.adjust, qvalue, everything()) |>
+    relocate(geneID, .after = last_col())
+  
+  write.csv(int_limma_res, paste("output/dataframes/df",filename,"genes.csv",sep = "_"))
+  write.csv(int_enricher_res_tbl, paste("output/dataframes/df",filename,"pathways.csv",sep = "_"))
+  write.csv(kegg_res_tbl, paste("output/dataframes/df",filename,"kegg.csv",sep = "_"))
+
 }
 
-medium_p27 <- do_medium_analysis(filename = "output/p_vs_s_passage_p27.sqlite", reference_passage = "p27")
-medium_p77 <- do_medium_analysis(filename = "output/p_vs_s_passage_p77.sqlite", reference_passage = "p77")
+medium_p27 <- do_medium_analysis(filename = "media_p27", reference_passage = "p27")
+medium_p77 <- do_medium_analysis(filename = "media_p77", reference_passage = "p77")
+
+
+
