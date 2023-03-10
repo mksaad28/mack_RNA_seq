@@ -423,7 +423,7 @@ do_medium_analysis <- function(filename, reference_passage) {
     data = sample_lookup |>
       mutate(
         protocol = relevel(factor(protocol), "p"),
-        passage = relevel(factor(passage), reference_passage)
+        passage = relevel(factor(passage), "p77")
       )
   )
 
@@ -514,4 +514,5 @@ medium_p27 <- do_medium_analysis(filename = "media_p27", reference_passage = "p2
 medium_p77 <- do_medium_analysis(filename = "media_p77", reference_passage = "p77")
 
 
+## Visualizations
 
