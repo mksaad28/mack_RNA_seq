@@ -528,5 +528,48 @@ medium_p27 <- do_medium_analysis(filename = "media_p27", reference_passage = "p2
 medium_p77 <- do_medium_analysis(filename = "media_p77", reference_passage = "p77")
 
 
-## Visualizations
+## Constitutive gene expression data (overlap between p_adj < 0.01 for each protocol)
+constitutive_df <- read_csv('dataframes for Carlos/intersection_all.csv')
 
+# GO
+const_enricher_obj <- enricher(
+  gene = constitutive_df |> pull(gene_id),
+  TERM2GENE = term_to_gene
+)
+
+const_enricher_res <- const_enricher_obj@result |> as_tibble()
+
+const_go_lookup <- go2term(const_enricher_res$ID) |>
+  as_tibble() |>
+  left_join(go2ont(const_enricher_res$ID), by = "go_id") |>
+  mutate(Ontology = case_when(
+    Ontology == "BP" ~ "Biological Process",
+    Ontology == "MF" ~ "Molecular Function",
+    Ontology == "CC" ~ "Cellular Component"
+  ))
+
+const_enricher_res_tbl <- const_enricher_res |>
+  left_join(const_go_lookup, by = c("ID" = "go_id")) |>
+  rowwise() |>
+  mutate(ratio = eval(parse(text = GeneRatio)) / eval(parse(text = BgRatio))) |>
+  select(-Description) |>
+  select(Term, Ontology, ratio, pvalue, p.adjust, qvalue, everything()) |>
+  relocate(geneID, .after = last_col())
+
+# KEGG
+const_kegg_obj <- enricher(
+  gene = constitutive_df |> pull(gene_id),
+  TERM2GENE = term_to_brite
+)
+
+const_kegg_res_tbl <- const_kegg_obj@result |> 
+  as_tibble() |>
+  inner_join(kegg_categories, by = c("ID" = "brite")) |>
+  rowwise() |>
+  mutate(ratio = eval(parse(text = GeneRatio)) / eval(parse(text = BgRatio))) |>
+  select(-Description) |>
+  select(category, ratio, pvalue, p.adjust, qvalue, everything()) |>
+  relocate(geneID, .after = last_col())
+
+write.csv(const_enricher_res_tbl, "output/dataframes/df_constitutive_pathways.csv")
+write.csv(const_kegg_res_tbl, "output/dataframes/df_constitutive_KEGG.csv")
