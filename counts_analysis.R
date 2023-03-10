@@ -148,15 +148,29 @@ expr_withmeta <- expr_clean |>
   left_join(sample_lookup, by = "sample")
 
 # Run CalcNormFactors and compare cpm to that without normalization --> conclusion, normalization doesn't change much
+
+# first create DGE object
 expr_wide_DGE <- expr_wide |>
     select(-gene_id) |> DGEList()
 
+# Use without interaction design for removing zero or low counts
+expr_design <- model.matrix(~ passage + protocol,
+                            data = sample_lookup
+)
+
+keep <- filterByExpr(expr_wide |> select(-gene_id), expr_design)
+
+
+expr_wide_DGE <- expr_wide_DGE[keep,keep.lib.sizes=FALSE]
+
+
+# Then, run normalization
 expr_wide_DGE_norm <- calcNormFactors(expr_wide_DGE)
 
 expr_wide_norm_cpm <- expr_wide_DGE_norm$counts |>
     cpm() |>
     as_tibble() |>
-    mutate(gene_id = expr_wide$gene_id) # counts per million
+    mutate(gene_id = expr_wide[keep,keep.lib.sizes=FALSE]$gene_id) # counts per million
 
 expr_long_norm_cpm <- expr_wide_norm_cpm |>
     pivot_longer(-gene_id,
