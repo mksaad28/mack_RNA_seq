@@ -176,6 +176,10 @@ summary(linear_model_comp_norm)
 plot( expr_long_comp_norm$wo_norm, expr_long_comp_norm$with_norm )
 abline( linear_model_comp_norm)
 
+# Save normalized dataframe
+write.csv(expr_wide_norm_cpm, "output/dataframes/counts_norm_cpm.csv")
+
+
 # PCA ---------------------------------------------------------------------
 
 
