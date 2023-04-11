@@ -1,0 +1,363 @@
+---
+title: "counts_anlysis_v2"
+author: Michael, Benji, Archana, Nico
+date: April 2023
+output: html_notebook
+---
+# Counts Analysis Goal
+Perform differential gene expression and pathway enrichment analysis on 
+mack1 RNA Seq results
+
+--\> Process eggnogmapper file from Nico (queried with
+GCF_910596095.1/cds_from_genomic.fna and the default settings on
+## http://eggnog-mapper.embl.de)
+
+--\> Process feature_counts file
+
+--\> Perform PCA for sanity check (protocols separated, passages clustered)
+
+--\> Create function for differential expression
+
+--\> Create function for pathway enrichment analysis
+
+--\> Would also like to create a function for pathway depletion analysis
+
+## Read in necessary libraries for analysis
+```{r Load dependencies/libraries}
+# Be sure to set the right wd (working directory)
+source("api.R")
+library(tidyverse)
+library(DESeq2)
+library(dplyr)
+library(clusterProfiler)
+library(readxl)
+library(edgeR)
+library(vsn)
+library(ggrepel)
+library(pheatmap)
+```
+
+
+##### ------------ eggnogg ------
+## Necessary argument from orthology because neither tuna or mackerel genomes
+## are in handy databases like ensembl, gene ontology, or kegg. First we read
+## the cds from GCF_910596095.1 and extract the cds accession and the gene id.
+## This is necessary because the cds from GCF_910596095.1 were fed into
+## eggnogg-mapper. This file was downloaded from NCBI genomes. 
+```{r Eggnog}
+a <- readLines("data/michael_saad/GCF_910596095.1/cds_from_genomic.accessions_only.fna") #read in fasta file
+
+query_to_gene <- tibble()
+for (line in a) {                              #iterates through the fasta file
+  if (!str_starts(line, ">")) next             #processes lines that begin with >
+  line_split <- str_split(line, " ")[[1]]      #splits line into vector, based on space
+  accession <- str_remove(line_split[1], ">")  #stores accession as the first element in vector, after removing ">"
+  
+  if (!str_detect(line_split[2], "gene")) stop("Missing gene symbol in second field") #ensures there is gene in the second element in vector
+  gene_symbol <- line_split[2] |>  #pulls out gene_symbol by removing string parts from the 2nd element
+    str_remove(fixed("[gene=")) |>
+    str_remove(fixed("]"))
+  
+  if (!str_detect(line_split[3], "db_xref=GeneID")) stop("Missing gene_id in third field")
+    GeneID <- line_split[3] |>
+      str_remove(fixed("[db_xref=GeneID:")) |>
+      str_remove(fixed("]"))
+
+  query_to_gene <- bind_rows(query_to_gene, bind_cols(
+    query = accession, gene_symbol = gene_symbol,gene_id = GeneID)) #stores the accession, gene_symbol, and gene_id in query_to_gene
+  #Same number of unique values in gene_symbol and gene_id columns
+}  
+  
+
+#' Then we read the eggnogg mapper excel file resulting from querying it with
+#' GCF_910596095.1/cds_from_genomic.fna and the default settings on
+#' http://eggnog-mapper.embl.de
+#' 
+#' Change to eggnogg_id once the feature_counts is by gene_id
+eggnogg_symbol <- readxl::read_xlsx("data/michael_saad/MM_8hli8sc6.emapper.annotations.xlsx", 
+                             skip = 2) |>
+  left_join(query_to_gene, by = "query") |>
+  select(gene_symbol, everything()) |>
+  group_by(gene_symbol) |>
+  slice_head(n = 1)
+#' this is a little rough, taking only the first representative per gene when
+#' there are multiple transcripts/proteins in the cds dataset. To me (Michael),
+#' it seems like the highest scores are always first, so likely the most accurate mapping?
+
+# Break the eggnogg results into long format
+genes_and_brite <- eggnogg_symbol |>
+  select(gene_symbol, BRITE) |>
+  rename(brite = BRITE) |>
+  rowwise() |>
+  mutate(brite = str_split(brite, ",")) |>
+  unnest(cols = c(brite))
+
+# Delete this or genes_and_brite (whichever isn't used)
+term_to_brite <- genes_and_brite[c('brite','gene_symbol')]
+
+# get gene ontologies out of eggnogg.
+term_to_gene <- eggnogg_symbol |>
+  select(gene_symbol, GOs) |>
+  filter(GOs != "-") |>
+  separate_rows(GOs, sep = ",") |>
+  rename(GO = GOs) |>
+  select(GO, gene_symbol)
+
+
+# kegg categories from yanky br08902 file.
+kegg_categories <- jsonlite::read_json("data/br08902.json") |>
+  unlist() |>
+  as_tibble() |>
+  separate(value, into = c("brite", NA), remove = FALSE, extra = "drop") |>
+  mutate(brite = str_replace(brite, "Protein", NA_character_)) |>
+  rename(category = value)
+
+```
+
+# Data wrangling and processing of gene expression data
+
+The following R chunk performs various data wrangling tasks on gene expression 
+data in order to prepare it for downstream analysis. The script reads in two 
+files containing gene and expression data respectively, and then proceeds to 
+clean and transform the data in several ways.
+
+```{r Data wrangling and processing of gene expression data}
+#' Read in the gene expression data from a TSV file, select the Symbol and 
+#' description columns, remove any duplicates, group by gene symbol, 
+#' concatenate the descriptions for each gene into a single string, 
+#' and rename the Symbol column to gene_id.
+gene_lookup <- read_tsv("data/michael_saad/gene_result.txt", 
+                        col_types = cols(GeneID = col_character()),
+                        guess_max = 10^10)
+
+gene_lookup_abridged <- gene_lookup |> select(GeneID, description) # will use this when gene_id is in feature_counts
+
+gene_lookup_symbol <- gene_lookup |>
+              select(Symbol, description) |>
+              unique() |>
+              group_by(`Symbol`) |>
+              summarize(
+                description = paste(description, collapse = ";"),
+                .groups = "drop") |>
+  # Assure a 1:1 mapping even when there are multiple entries for 1 ensembl ID
+              rename(gene_id = Symbol)
+
+gene_id_symbol <- gene_lookup |> select(GeneID, Symbol)
+
+#> length(unique(gene_lookup$Symbol))
+#[1] 31108
+#> length(unique(gene_lookup$GeneID))
+#[1] 33655
+# Delete below if no issues #!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#' Group the gene lookup data by gene ID and count the number of entries for 
+#' each gene, and filter out genes that have more than one entry.
+#gene_lookup_2 |>
+#  group_by(gene_id) |>
+#  summarize(n = n()) |>
+#  filter(n != 1)
+
+#' # Read in the gene expression data from a TSV file, skip the first row, 
+#' select all columns except Chr, Start, End, Strand, and Length, rename the 
+#' Geneid column to gene_id, pivot the data from wide to long format, and 
+#' remove the "STAR2/output/" and "Aligned.sortedByCoord.out.bam" strings 
+#' from the sample column.
+expr_long <- read_tsv("data/michael_saad/featurecounts_results.txt", skip = 1) |>
+  select(-Chr, -Start, -End, -Strand, -Length) |>
+  rename(gene_symbol = Geneid) |>
+  pivot_longer(-gene_symbol, names_to = "sample", values_to = "count") |>
+  mutate(sample = str_remove(sample, "STAR2/output/") |> 
+           str_remove("Aligned.sortedByCoord.out.bam"))
+
+# Create a sample_lookup table from the sample names in the expr_long and
+# breaks in down into passage, protocol, and replicate
+sample_lookup <- expr_long |>
+  select(sample) |>
+  unique() |>
+  separate(sample, into = c("passage", "protocol_replicate"), remove = FALSE) |>
+  mutate(
+    protocol = str_sub(protocol_replicate, 1, 1),
+    replicate = str_sub(protocol_replicate, 2, 2)
+  ) |>
+  select(-protocol_replicate)
+
+#' Group the gene expression data by gene symbol, calculate the proportion of 
+#' samples with count 0 for each gene, and create a histogram 
+#' of the proportion values.
+expr_long |>
+  group_by(gene_symbol) |>
+  summarize(prop_count0 = mean(count == 0)) |>
+  ggplot() +
+  aes(x = prop_count0) +
+  geom_histogram(binwidth = 0.1)
+
+#' Group the gene expression data by gene symbol, add a column for the proportion 
+#' of samples with count 0 for each gene, filter out genes where the proportion 
+#' is always 1, remove the additional column, and ungroup the data.
+expr_clean <- expr_long |>
+  group_by(gene_symbol) |>
+  mutate(gene_prop_count0 = mean(count == 0)) |>
+  filter(gene_prop_count0 != 1) |>
+  select(-gene_prop_count0) |>
+  ungroup() ## ^^ Get rid of the genes which are always 0.
+
+# Pivot the gene expression data from long to wide format, with one column 
+# for each sample.
+expr_wide <- expr_clean |>
+  pivot_wider(names_from = sample, values_from = count)
+
+# Look in to duplicated gene symbols
+duplicated_symbol <- gene_lookup[duplicated(gene_lookup$Symbol),]
+expr_wide_duplicated <-merge(expr_wide, duplicated_symbol, by.x=c("gene_symbol"), by.y=c("Symbol"))
+# Pretty much everything has low counts
+```
+
+
+# DESeq2
+```{r Function for DESeq2 }
+# Function: run_DESeq2 performs differential expression on our dataset, using 
+  #DESeq2 and specified inputs
+
+# Pre-requisites
+  # expr_wide_prep: dataframe of RNA Seq counts, ready for DESeq2
+  # meta: metadata, currently passage, protocol, and the combination
+
+# INPUTS
+  # design: formula for model, based on combinations of columns in meta 
+    #(e.g. design_arg = ~ passage)
+  # contrast: vector to specify the comparison for log2-fold changes. Typically,
+    # this will contain three elements: 1) the condition to test (usually in the
+    # design formula), 2) the value in that condition for the numerator, 3) the
+    # value in that condition for the denominator
+          # e.g., contrast_arg = c("passage", "p77", "p27")
+
+# OUTPUTS: List with three data frames
+  # df_counts_norm: data frame with normalized counts
+  # df_counts_rld: data frame with counts regularized log transformed (rld)
+  # df_res: data frame with differential expression results, after shrinkage
+
+# Before the function, pre-processing of data and metadata
+
+# Make rowname of expr_wide_prep the gene symbol (needed for DESeq2)
+expr_wide_prep <- expr_wide |>
+  column_to_rownames(var = "gene_symbol")
+
+# Create metadata table for protocol, passage, or a combination of the two
+meta <- sample_lookup |> 
+  column_to_rownames(var = "sample") |>
+  select(-replicate) |>
+  mutate(passage_protocol = paste(passage,protocol, sep = '_'))
+
+# FUNCTION STARTS
+run_DESeq2 <- function(design_arg, contrast_arg) {
+  # Create DESeq dataset then run DESeq, which runs estimateSizeFactors,
+  # estimateDispersions, and nbinomWaldTest
+  dds <- DESeqDataSetFromMatrix(countData = expr_wide_prep, colData = meta, design = design_arg)
+  dds <- DESeq(dds)
+  
+  # The rlog transformation computes the log2-transformed normalized count data with a per-sample shift factor, which is chosen to minimize the dependence of the variance on the mean.
+  rld <- rlog(dds, blind=TRUE)
+  
+  # Data tables for plotting: Normalized and regularized log transformed (rld)
+  df_counts_rld <- assay(rld) |> as.data.frame()
+  df_counts_norm <- counts(dds, normalized = TRUE) |> as.data.frame()
+  
+  # Plot PCA
+  plotPCA(rld, intgroup=contrast_arg[1]) + geom_text(aes(label=name))
+  
+  # Specify conditions for differential expression then run
+  # Contrast matrix is column of meta matrix to compare, then the two conditions
+  # to compare. The condition that comes first will be the numerator in log2FC
+  res_unshrunken <- results(dds, contrast=contrast_arg)
+  summary(res_unshrunken)
+  
+  # Shrinkage of log2 fold changes: avoid overestimates of differences between genes with high dispersion
+  res <- lfcShrink(dds,contrast=contrast_arg, res=res_unshrunken, type = 'ashr')
+  df_res <- res |> as.data.frame()
+
+  
+  output_run_DESeq2 <- list(df_counts_norm = df_counts_norm, df_counts_rld = df_counts_rld, df_res = df_res)
+  
+  return(output_run_DESeq2)
+}
+```
+
+Run run_DESeq2
+```{r}
+output_run_DESeq2_passage_p77_p27 <- run_DESeq2(design_arg = ~ passage, contrast_arg = c("passage", "p77", "p27"))
+#ouput_run_DESeq2_passage_protocol_p77p_P27p <- run_DESeq2(design_arg = ~ passage_protocol, contrast_arg = c("passage_protocol", "p77_p", "p27_p"))
+```
+
+
+
+```{r Function for pathway enrichment}
+# run_pathway function: performs pathway enrichment analysis with enricher --
+  # using over representation analysis
+
+# INPUTS
+  # df_DESeq_res: the data frame of the differential expression results
+  # padj_cutoff: numeric value below which a gene is counted as significant
+
+# OUTPUTS: in list output_run_pathway
+  # go_res_tbl: table with pathway enrichment based on gene ontology
+  # kegg_res_tbl: table with pathway enrichment based on KEGG brite
+
+run_pathway <- function(df_DESeq_res, padj_cutoff) {
+  enricher_obj <- enricher(
+    gene = df_DESeq_res |> filter(padj < padj_cutoff) |> rownames(),
+    universe = df_DESeq_res |> rownames(),
+    TERM2GENE = term_to_gene #takes gene symbol now; convert to gene_id later
+  )
+  # enricher: A universal enrichment analyzer
+  # genes are significant genes, universe is all genes. 
+  # Later used for over representation analysis (ORA)
+  
+  # Sample code to convert to geneID (loses ~350 genes)
+  #df_res_geneID <- output_passage_77_27$df_res |> rownames() |> as.data.frame() |> setNames("Symbol") |> left_join(gene_id_symbol, by = "Symbol") |> as.data.frame()
+  
+  enricher_res <- enricher_obj@result |> as_tibble()
+
+  go_lookup <- go2term(enricher_res$ID) |>
+    as_tibble() |>
+    left_join(go2ont(enricher_res$ID), by = "go_id") |>
+    mutate(Ontology = case_when(
+      Ontology == "BP" ~ "Biological Process",
+      Ontology == "MF" ~ "Molecular Function",
+      Ontology == "CC" ~ "Cellular Component"
+    ))
+
+  go_res_tbl <- enricher_res |>
+    left_join(go_lookup, by = c("ID" = "go_id")) |>
+    rowwise() |>
+    mutate(ratio = eval(parse(text = GeneRatio)) / eval(parse(text = BgRatio))) |>
+    select(-Description) |>
+    select(Term, Ontology, ratio, pvalue, p.adjust, qvalue, everything()) |>
+    relocate(geneID, .after = last_col())
+
+  
+  ## KEGG
+  kegg_obj <- enricher(
+    gene = df_DESeq_res |> filter(padj < padj_cutoff) |> rownames(),
+    universe = df_DESeq_res |> rownames(),
+    TERM2GENE = term_to_brite #takes gene symbol now; convert to gene_id later
+  )
+  
+  kegg_res_tbl <- kegg_obj@result |> 
+    as_tibble() |>
+    inner_join(kegg_categories, by = c("ID" = "brite")) |>
+    rowwise() |>
+    mutate(ratio = eval(parse(text = GeneRatio)) / eval(parse(text = BgRatio))) |>
+    select(-Description) |>
+    select(category, ratio, pvalue, p.adjust, qvalue, everything()) |>
+    relocate(geneID, .after = last_col())
+
+  output_run_pathway <- list(go_res_tbl = go_res_tbl, kegg_res_tbl = kegg_res_tbl)
+  return(output_run_pathway)
+  
+  }
+```
+
+Run run_pathway
+```{r}
+output_run_pathway_passage_p77_p27 <- run_pathway(df_DESeq_res = output_run_DESeq2_passage_p77_p27$df_res, padj_cutoff = 0.05)
+```
+
