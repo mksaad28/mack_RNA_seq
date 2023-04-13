@@ -328,17 +328,24 @@ add_GeneID_to_df <- function(df_from_DESeq) {
   
   df_res_GeneID <- df_res_symbol_GeneID |> select(-Symbol)
   
+  df_res_GeneID_for_pathway <- df_res_GeneID |>
+    drop_na(padj,GeneID) |>
+    column_to_rownames(var = "GeneID")
   
   print(paste0("The number of rows using gene symbol is ",nrow(df_res_symbol)))
   print(paste0("The number of rows using gene ID is ",nrow(df_res_GeneID)))
   
   output_add_GeneID_to_df <- list(df_res_symbol = df_res_symbol, 
                                   df_res_symbol_GeneID = df_res_symbol_GeneID, 
-                                  df_res_GeneID = df_res_GeneID)
+                                  df_res_GeneID = df_res_GeneID,
+                                  df_res_GeneID_for_pathway = 
+                                    df_res_GeneID_for_pathway)
   return(output_add_GeneID_to_df)
 }
 
+
 output_add_GeneID_to_df_passage_p77_p27 <- add_GeneID_to_df(output_run_DESeq2_passage_p77_p27$df_res)
+
 ```
 
 ```{r Function for pathway enrichment}
