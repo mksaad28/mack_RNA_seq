@@ -23,7 +23,7 @@ GCF_910596095.1/cds_from_genomic.fna and the default settings on
 --\> Would also like to create a function for pathway depletion analysis
 
 ## Read in necessary libraries for analysis
-```{r Load dependencies/libraries}
+```{r Load dependencies/libraries, results='hide'}
 # Be sure to set the right wd (working directory)
 source("api.R")
 library(tidyverse)
@@ -47,8 +47,8 @@ Necessary argument from orthology because neither tuna or mackerel genomes
 ## eggnogg-mapper. This file was downloaded from NCBI genomes. 
 ```{r Eggnog}
 a <- 
-  readLines("data/michael_saad/GCF_910596095.1/cds_from_genomic.accessions" + 
-                 "_only.fna") # Read in fasta file
+  readLines(paste("data/michael_saad/GCF_910596095.1/cds_from_genomic", 
+                 ".accessions_only.fna",sep="")) # Read in fasta file
 
 query_to_gene <- tibble()
 # Iterates through the fasta file
@@ -142,36 +142,34 @@ clean and transform the data in several ways.
 #' description columns, remove any duplicates, group by gene symbol, 
 #' concatenate the descriptions for each gene into a single string, 
 #' and rename the Symbol column to gene_id.
+#' 
+#' 
+
 gene_lookup <- read_tsv("data/michael_saad/gene_result.txt", 
                         col_types = cols(GeneID = col_character()),
                         guess_max = 10^10)
-
-gene_lookup_abridged <- gene_lookup |> select(GeneID, description) 
-  # Will use this when gene_id is in feature_counts
-
-gene_lookup_symbol <- gene_lookup |>
-              select(Symbol, description) |>
-              unique() |>
-              group_by(`Symbol`) |>
-              summarize(
-                description = paste(description, collapse = ";"),
-                .groups = "drop") |>
-  # Assure a 1:1 mapping even when there are multiple entries for 1 ensembl ID
-              rename(gene_id = Symbol)
-
-gene_id_symbol <- gene_lookup |> select(GeneID, Symbol)
-
 #> length(unique(gene_lookup$Symbol))
 #[1] 31108
 #> length(unique(gene_lookup$GeneID))
 #[1] 33655
-# Delete below if no issues #!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#' Group the gene lookup data by gene ID and count the number of entries for 
-#' each gene, and filter out genes that have more than one entry.
-#gene_lookup_2 |>
-#  group_by(gene_id) |>
-#  summarize(n = n()) |>
-#  filter(n != 1)
+
+
+gene_lookup_filtered <- gene_lookup |>
+  select(Symbol, description,GeneID) |>
+  group_by(Symbol) |>
+  filter(!duplicated(Symbol)) |>
+  ungroup()
+  # Assure a 1:1 mapping even when there are multiple entries for 1 ensembl ID
+
+
+gene_lookup_GeneID <- gene_lookup_filtered |> select(GeneID, description) 
+  # Will use this when gene_id is in feature_counts
+
+gene_lookup_symbol <- gene_lookup_filtered |> select(Symbol, description)
+
+gene_id_symbol <- gene_lookup_filtered |> select(GeneID, Symbol)
+
+
 
 #' # Read in the gene expression data from a TSV file, skip the first row, 
 #' select all columns except Chr, Start, End, Strand, and Length, rename the 
@@ -221,12 +219,14 @@ expr_clean <- expr_long |>
 # Pivot the gene expression data from long to wide format, with one column 
 # for each sample.
 expr_wide <- expr_clean |>
-  pivot_wider(names_from = sample, values_from = count)
+  pivot_wider(names_from = sample, values_from = count) |>
+  rename(Symbol = gene_symbol)
+
 
 # Look in to duplicated gene symbols
 duplicated_symbol <- gene_lookup[duplicated(gene_lookup$Symbol),]
 expr_wide_duplicated <-merge(expr_wide, duplicated_symbol, 
-                             by.x=c("gene_symbol"), by.y=c("Symbol"))
+                             by=("Symbol"))
 # Pretty much everything has low counts
 ```
 
@@ -258,7 +258,7 @@ expr_wide_duplicated <-merge(expr_wide, duplicated_symbol,
 
 # Make rowname of expr_wide_prep the gene symbol (needed for DESeq2)
 expr_wide_prep <- expr_wide |>
-  column_to_rownames(var = "gene_symbol")
+  column_to_rownames(var = "Symbol")
 
 # Create metadata table for protocol, passage, or a combination of the two
 meta <- sample_lookup |> 
@@ -315,7 +315,31 @@ output_run_DESeq2_passage_p77_p27 <- run_DESeq2(design_arg = ~ passage,
 #              contrast_arg = c("passage_protocol", "p77_p", "p27_p"))
 ```
 
+CONVERT TO GeneID for ClusterProfiler viz
+```{r Switch out symbol for ID}
 
+add_GeneID_to_df <- function(df_from_DESeq) {
+  df_res_symbol <- df_from_DESeq |> 
+  rownames_to_column(var = 'Symbol')
+
+  # Gain of rows because symbol is not unique. @ Benji, how do you think we should
+  # handle this.
+  df_res_symbol_GeneID <- df_res_symbol |> left_join(gene_id_symbol, by = 'Symbol')
+  
+  df_res_GeneID <- df_res_symbol_GeneID |> select(-Symbol)
+  
+  
+  print(paste0("The number of rows using gene symbol is ",nrow(df_res_symbol)))
+  print(paste0("The number of rows using gene ID is ",nrow(df_res_GeneID)))
+  
+  output_add_GeneID_to_df <- list(df_res_symbol = df_res_symbol, 
+                                  df_res_symbol_GeneID = df_res_symbol_GeneID, 
+                                  df_res_GeneID = df_res_GeneID)
+  return(output_add_GeneID_to_df)
+}
+
+output_add_GeneID_to_df_passage_p77_p27 <- add_GeneID_to_df(output_run_DESeq2_passage_p77_p27$df_res)
+```
 
 ```{r Function for pathway enrichment}
 # run_pathway function: performs pathway enrichment analysis with enricher --
