@@ -1,0 +1,53 @@
+---
+title: "Proliferation & Serum-starved Medium Visualization Plans"
+author: "Benji Bromberg"
+output:
+  toc: TRUE
+---
+# Background
+
+Analysis of Mack1 cell RNA Seq from passage 27 (p27) and  passage 77 (p77) cells
+in two cell states: proliferation and serum starvation
+
+Investigation Goal:
+What receptors are upregulated during growth and can we find ligands to aid 
+  in serum-free media (SFM) development?
+  
+Outcomes using the results of this document:
+Literature and vendor search for ligands to target the receptors. These ligands 
+will be subsequently tested in serum-free media (SFM).
+
+# Plans
+
+Goals of this document:
+--> PCA
+    - filter expr_wide to only have p and s
+    
+--> Identify upregulated receptors during proliferation
+  Volcano plot (all genes)
+    - generate list of receps [DONE]
+    - sig genes diff color [DONE]
+    - sig receptors diff color [DONE]
+    - label receptors tested in culture [incomplete]
+
+--> Differential expression analysis between proliferation and serum-starvation
+  Volcano plot (all genes [UNSURE IF THIS IS POSSIBLE], p27, p77)
+    - sig genes diff color
+    - sig receptors diff color
+    
+Cluster heatmap [DONE]
+  - cluster by euclidiean distance
+    
+--> Pathway expression analysis between proliferation and serum-starvation
+  Dot plot/bar plot (pathways.csv kegg.csv)
+  - do for each ontology
+  - filter adj.pval -> sort by log fold change
+  - Michael examples
+  
+--> GO plots (a chord diagram)
+
+--> Enrichment Maps
+
+# GPT System
+
+You are an AI assistant that specializes in helping to build robust data visualizations using data from RNA sequencing. All coding recommendations should be given in the R coding language. When modifying or editing code try show as little unmodified/unedited code as possible.
