@@ -50,33 +50,61 @@ Goals of this document:
 source("General Pipeline Scripts/Libs for Gen Pipeline.R")
 
 # Actual Processing
-source("General Pipeline Scripts/Eggnog_Mapping.R")
+source("General Pipeline Scripts/Eggnog_Mapping (by GeneID).R")
 source("General Pipeline Scripts/Data_Wrang_and_PreProcess.R")
 
 # Functions
 source("General Pipeline Scripts/DESeq2.R")
 source("General Pipeline Scripts/GeneSymbol To GeneID.R")
+source("General Pipeline Scripts/Pathway Enrichment (by GeneSymbol).R")
 ```
 
-# DE
+# DESeq2 Function Calls
 ```{r}
-Output_protocol_p_s <- 
+# Combined genes
+Output_pro_combo <- 
   (run_DESeq2(design_arg = ~ protocol, 
               contrast_arg = c("protocol", "p", "s"))
    )$df_res |> 
   add_GeneID_to_df()
 
-Output_protocol_p77_p27 <- 
-  (run_DESeq2(design_arg = ~ passage, 
-              contrast_arg = c("passage", "p77", "p27"))
+Output_pro_plus_pass_combo <- 
+  (run_DESeq2(design_arg = ~ protocol + passage, 
+              contrast_arg = c("protocol", "p", "s"))
    )$df_res |> 
   add_GeneID_to_df()
 
-Output_protocol_p27_p77 <- 
-  (run_DESeq2(design_arg = ~ passage, 
-              contrast_arg = c("passage", "p27", "p77"))
+# Variation within p77
+Output_pass_pro_p77 <- 
+  (run_DESeq2(design_arg = ~ passage_protocol, 
+              contrast_arg = c("passage_protocol", "p77_p", "p77_s"))
    )$df_res |> 
   add_GeneID_to_df()
+
+# Variation within p27
+Output_pass_pro_p27 <- 
+  (run_DESeq2(design_arg = ~ passage_protocol, 
+              contrast_arg = c("passage_protocol", "p27_p", "p27_s"))
+   )$df_res |> 
+  add_GeneID_to_df()
+```
+
+# Pathway Enrichment Function Calls
+```{r}
+# Combined genes
+Pathway_pro_combo <- 
+  run_pathway(Output_pro_combo$df_res_GeneID_for_pathway, 0.01)
+
+Pathway_pro_plus_pass_combo <-  
+  run_pathway(Output_pro_plus_pass_combo$df_res_GeneID_for_pathway, 0.01)
+
+# Variation within p77
+Pathway_pass_pro_p77 <- 
+  run_pathway(Output_pass_pro_p77$df_res_GeneID_for_pathway, 0.01)
+
+# Variation within p27
+Pathway_pass_pro_p27 <- 
+  run_pathway(Output_pass_pro_p27$df_res_GeneID_for_pathway, 0.01)
 ```
 
 # Receptor Information
@@ -87,92 +115,95 @@ https://www.ncbi.nlm.nih.gov/gene/?term=receptor%5BAll+Fields%5D+AND+%22thunnus+
   Search terms for NCBI genes:
     receptor[All Fields] AND "thunnus maccoyii"[porgn] AND alive[prop] 
 
-## create_receptor_list function
+## get_upreg_receptor_list function
 
 Function to create a list of upregulated upregulated receptors from
 the input csv file
 
 ```{r}
-get_upreg_receptor_list <- function(csv_file_name) {
+GetUpregReceptorList <- function(df_res_GeneID) {
   # Load required packages
   library(dplyr)
-  
-  # Construct the full file path
-  full_file_path <- paste0("output/dataframes/", csv_file_name)
   
   # Define a list of receptor genes to compare against
   receptor_list <- read.csv("thunnus_maccoyii_receptors.csv")
     # receptor_list is populated by a list of hits on the NCBI gene database
     # for the search "receptor" against the Thunnus Maccoyii genome.
   
-  # Define differential gene expression data
-  DGE <- read.csv(full_file_path)
-  
   # Extract gene_id, LFC values, and adjusted p-values for each receptor gene
-  receptors <- DGE %>% filter(gene_id %in% receptor_list$Symbol) %>% 
-    select(gene_id, logFC, adj.P.Val)
+  receptors <- df_res_GeneID %>% filter(GeneID %in% receptor_list$GeneID) %>% 
+    select(GeneID, log2FoldChange, padj)
   
   # Filter for significantly upregulated receptors 
     # (e.g., adjusted p-value < 0.05 and logFC > 1)
-  upreg_receptors <- receptors %>% filter(adj.P.Val < 0.05, logFC > 1)
+  upreg_receptors <- receptors %>% filter(padj < 0.01, log2FoldChange > 1)
   
   # Return the top 15 upregulated receptors
   return(upreg_receptors)
 }
 ```
 
-## Create receptor lists
+## Create lists of upregulated receptors
 ```{r}
-upreg_receptors_p27 <- get_upreg_receptor_list("df_media_p27_genes.csv")
-upreg_receptors_p77 <- get_upreg_receptor_list("df_media_p77_genes.csv")
-upreg_receptors_combined <- get_upreg_receptor_list("df_media_combined_genes.csv")
-```
+# Combined genes
+Upreg_recep_pro_combo <- 
+  GetUpregReceptorList(Output_pro_combo$df_res_GeneID)
 
+Upreg_recep_pro_plus_pass_combo <-  
+  GetUpregReceptorList(Output_pro_plus_pass_combo$df_res_GeneID)
+
+# Variation within p77
+Upreg_recep_pass_pro_p77 <- 
+  GetUpregReceptorList(Output_pass_pro_p77$df_res_GeneID)
+
+# Variation within p27
+Upreg_recep_pass_pro_p27 <- 
+  GetUpregReceptorList(Output_pass_pro_p27$df_res_GeneID)
+```
 
 # Volcano Plots
 ## create_volcano_plot function
 
 ```{r}
-create_volcano_plot <- function(csv_file_name, plot_title, receptors_shown) {
+create_volcano_plot <- function(df_res_GeneID, plot_title, receptors_shown) {
   # Load required packages
   library(ggplot2)
   library(dplyr)
   library(ggrepel)
   
   # Define the significance threshold
-  sig_threshold <- 0.05
+  sig_threshold <- 0.01
 
   # Define the logFC threshold
   logFC_threshold <- 1
   
-  # Construct the full file path
-  full_file_path <- paste0("output/dataframes/", csv_file_name)
-  
   # Define differential gene expression data
-  DGE <- read.csv(full_file_path)
-  
+  DGE <- df_res_GeneID
   
   # Create a new column to label significant genes
-  DGE$significant <- ifelse(DGE$adj.P.Val <= sig_threshold & abs(DGE$logFC) >= logFC_threshold, "Significant", "Not Significant")
+  DGE$significant <- ifelse(DGE$padj <= sig_threshold & 
+                              abs(DGE$log2FoldChange) >= logFC_threshold, 
+                            "Significant", "Not Significant")
 
   if(receptors_shown == TRUE) {
     # Define the top receptors
-    upreg_receptors <- get_upreg_receptor_list(csv_file_name)$gene_id
+    upreg_receptors <- GetUpregReceptorList(df_res_GeneID)$GeneID
     
     # Create a new column to label upregulated receptors
-    DGE$upreg_receptors <- ifelse(DGE$gene_id %in% upreg_receptors, "Upregulated Receptors", DGE$significant)
+    DGE$upreg_receptors <- ifelse(DGE$GeneID %in% upreg_receptors, 
+                                  "Upregulated Receptors", DGE$significant)
   
     # Set up the plot
-    ggplot(DGE, aes(x = logFC, y = -log10(adj.P.Val), 
+    ggplot(DGE, aes(x = log2FoldChange, y = -log10(padj), 
                     color = upreg_receptors)) +
       geom_point(size = 1) +
       
-      # Add vertical line for logFC = 0
+      # Add vertical line for log2FoldChange = 0
       geom_vline(xintercept = 0, linetype = "dashed", color = "gray40", 
                  size = 0.5) +
       
-      # Add horizontal line for adj.P.Val = 0.05
-      geom_hline(yintercept = -log10(0.05), linetype = "dashed", 
+      # Add horizontal line for padj = 0.01
+      geom_hline(yintercept = -log10(0.01), linetype = "dashed", 
                  color = "gray40", size = 0.5) +
       
       # Add plot labels and title
@@ -180,16 +211,16 @@ create_volcano_plot <- function(csv_file_name, plot_title, receptors_shown) {
            color = "", title = plot_title)
   } else {
     # Set up the plot
-    ggplot(DGE, aes(x = logFC, y = -log10(adj.P.Val), 
+    ggplot(DGE, aes(x = log2FoldChange, y = -log10(padj), 
                   color = significant)) + 
       geom_point(size = 1) + 
       
-      # Add vertical line for logFC = 0
+      # Add vertical line for log2FoldChange = 0
       geom_vline(xintercept = 0, linetype = "dashed", 
                  color = "gray40", size = 0.5) +
     
-      # Add horizontal line for adj.P.Val = 0.05
-      geom_hline(yintercept = -log10(0.05), linetype = "dashed", 
+      # Add horizontal line for padj = 0.01
+      geom_hline(yintercept = -log10(0.01), linetype = "dashed", 
                  color = "gray40", size = 0.5) +
       
       # Add plot labels and title
@@ -201,14 +232,31 @@ create_volcano_plot <- function(csv_file_name, plot_title, receptors_shown) {
 
 ## Create volcano plots
 ```{r}
-volcano_p27 <- create_volcano_plot("df_media_p27_genes.csv", "Mack1 p27 DGE", FALSE)
-volcano_p77 <- create_volcano_plot("df_media_p77_genes.csv", "Mack1 p77 DGE", FALSE)
-volcano_combined <- create_volcano_plot("df_media_combined_genes.csv", "Mack1 DGE During Proliferation", TRUE)
+volcano_combined <- 
+  create_volcano_plot(Output_pro_combo$df_res_GeneID, 
+                      "Mack1 DGE During Proliferation (~ Protocol)", 
+                      TRUE)
+
+volcano_combined_with_passage <- 
+  create_volcano_plot(Output_pro_plus_pass_combo$df_res_GeneID, 
+                      "Mack1 DGE During Proliferation (~ Protocol + Passage)", 
+                      TRUE)
+
+volcano_p77 <- 
+  create_volcano_plot(Output_pass_pro_p77$df_res_GeneID, 
+                      "Mack1 p77 DGE", 
+                      FALSE)
+
+volcano_p27 <- 
+  create_volcano_plot(Output_pass_pro_p27$df_res_GeneID, 
+                      "Mack1 p27 DGE", 
+                      FALSE)
 
 # Display the plots
-volcano_p27
-volcano_p77
 volcano_combined
+volcano_combined_with_passage
+volcano_p77
+volcano_p27
 ```
 
 
@@ -243,374 +291,6 @@ create_heatmap <- function(expr_data) {
 ```
 
 ```{r}
-create_heatmap(expr_wide_cpm)
+create_heatmap(expr_wide)
 ```
 
-
-# Enrichment Pathways Visualization (version one pathways.csv)
-
-## Bar plot: Least Significant Pathways (Filters: pval\<0.05; arrange(qvalue), top_n(30,qvalue))
-
-```{r}
-library(ggplot2)
-library(dplyr)
-
-# Load pathway enrichment results
-enrichment_results <- read.csv("output/dataframes/df_media_p27_pathways.csv")
-
-# Filter for significant pathways
-enrichment_results <- enrichment_results %>%
-  filter(p.adjust < 0.05)
-
-# Sort by q-value
-enrichment_results <- enrichment_results %>%
-  arrange(qvalue) %>%
-  top_n(30, qvalue)
-
-# Create bar plot
-ggplot(enrichment_results, aes(x = reorder(Term, -log10(qvalue)), y = -log10(qvalue), fill = Ontology)) +
-  geom_col() +
-  coord_flip() +
-  xlab("Pathway") +
-  ylab("-log10(q-value)") +
-  ggtitle("Least Enriched Pathways in p27") +
-  scale_fill_manual(values = c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3")) +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5)) 
-
-# Load pathway enrichment results
-enrichment_results <- read.csv("output/dataframes/df_media_p77_pathways.csv")
-
-# Filter for significant pathways
-enrichment_results <- enrichment_results %>%
-  filter(p.adjust < 0.05)
-
-# Sort by q-value
-enrichment_results <- enrichment_results %>%
-  arrange(qvalue) %>%
-  top_n(30, qvalue)
-
-# Create bar plot
-ggplot(enrichment_results, aes(x = reorder(Term, -log10(qvalue)), 
-                               y = -log10(qvalue), fill = Ontology)) +
-  geom_col() +
-  coord_flip() +
-  xlab("Pathway") +
-  ylab("-log10(q-value)") +
-  ggtitle("Least Enriched Pathways in p77") +
-  scale_fill_manual(values = c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3")) +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5)) 
-```
-
-## Bar plot: Most Significant Pathways (Filters: pval\<0.05; arrange(qvalue), top_n(-30,qvalue))
-
-```{r}
-library(ggplot2)
-library(dplyr)
-
-# Load pathway enrichment results
-enrichment_results <- read.csv("output/dataframes/df_media_p27_pathways.csv")
-
-# Filter for significant pathways
-enrichment_results <- enrichment_results %>%
-  filter(p.adjust < 0.05)
-
-# Sort by q-value
-enrichment_results <- enrichment_results %>%
-  arrange(qvalue) %>%
-  top_n(-30, qvalue)
-
-# Create bar plot
-ggplot(enrichment_results, aes(x = reorder(Term, -log10(qvalue)), y = -log10(qvalue), fill = Ontology)) +
-  geom_col() +
-  coord_flip() +
-  xlab("Pathway") +
-  ylab("-log10(q-value)") +
-  ggtitle("Most Enriched Pathways in p27") +
-  scale_fill_manual(values = c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3")) +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5)) 
-
-# Load pathway enrichment results
-enrichment_results <- read.csv("output/dataframes/df_media_p77_pathways.csv")
-
-# Filter for significant pathways
-enrichment_results <- enrichment_results %>%
-  filter(p.adjust < 0.05)
-
-# Sort by q-value
-enrichment_results <- enrichment_results %>%
-  arrange(qvalue) %>%
-  top_n(-30, qvalue)
-
-# Create bar plot
-ggplot(enrichment_results, aes(x = reorder(Term, -log10(qvalue)), y = -log10(qvalue), fill = Ontology)) +
-  geom_col() +
-  coord_flip() +
-  xlab("Pathway") +
-  ylab("-log10(q-value)") +
-  ggtitle("Most Enriched Pathways in p77") +
-  scale_fill_manual(values = c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3")) +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5)) 
-```
-
-# Enrichment Pathways Visualization (version two)
-## create_dotplot function (version 1)
-```{r}
-create_dotplot <- function(output) {
-  # Load required packages
-  library(enrichplot)
-  
-  
-  # Filter the enriched pathways by adjusted p value and sort by log fold change
-  kegg_df_filtered <- output$kegg_df %>%
-    filter(p.adjust < 0.05) %>%
-    arrange(desc(qvalue))
-  
-  bp_df_filtered <- output$pathways_df %>%
-    filter(Ontology == "Biological Process", p.adjust < 0.05) %>%
-    arrange(desc(qvalue))
-  
-  mf_df_filtered <- output$pathways_df %>%
-    filter(Ontology == "Molecular Function", p.adjust < 0.05) %>%
-    arrange(desc(qvalue))
-  
-  cc_df_filtered <- output$pathways_df %>%
-    filter(Ontology == "Cellular Component", p.adjust < 0.05) %>%
-    arrange(desc(qvalue))
-  
-  # Create the KEGG dotplot
-  kegg_plot <- dotplot(medium_p27$genes_df, genes_df$qvalue, genes_df$adj.P.Val,
-                      xlab = "Log Fold Change", pch = 19, cex = 0.8,
-                      color = ifelse(kegg_df$qvalue > 0, "red", "blue"),
-                      main = "KEGG Pathway Analysis")
-  
-  
-  ggplot(kegg_df_filtered, aes(x = qvalue, y = category)) +
-    geom_point(aes(size = -log10(p.adjust), color = qvalue > 0)) +
-    scale_size_continuous(range = c(2, 8)) +
-    scale_color_manual(values = c("tomato", "steelblue")) +
-    labs(x = "Log Fold Change", y = "Category", 
-         title = "KEGG Pathway Analysis") +
-    theme_classic() +
-    theme(legend.position = "right")
-  
-  # Create the BP dotplot
-  bp_plot <- ggplot(bp_df_filtered, aes(x = qvalue, y = Term)) +
-    geom_point(aes(size = -log10(p.adjust), color = qvalue > 0)) +
-    scale_size_continuous(range = c(2, 8)) +
-    scale_color_manual(values = c("tomato", "steelblue")) +
-    labs(x = "Log Fold Change", y = "Term", 
-         title = "GO Biological Process Analysis") +
-    theme_classic() +
-    theme(legend.position = "right")
-  
-  # Create the MF dotplot
-  mf_plot <- ggplot(mf_df_filtered, aes(x = qvalue, y = Term)) +
-    geom_point(aes(size = -log10(p.adjust), color = qvalue > 0)) +
-    scale_size_continuous(range = c(2, 8)) +
-    scale_color_manual(values = c("tomato", "steelblue")) +
-    labs(x = "Log Fold Change", y = "Term", 
-         title = "GO Molecular Function Analysis") +
-    theme_classic() +
-    theme(legend.position = "right")
-  
-  # Create the CC dotplot
-  cc_plot <- ggplot(cc_df_filtered, aes(x = qvalue, y = Term)) +
-    geom_point(aes(size = -log10(p.adjust), color = qvalue > 0)) +
-    scale_size_continuous(range = c(2, 8)) +
-    scale_color_manual(values = c("tomato", "steelblue")) +
-    labs(x = "Log Fold Change", y = "Term", 
-         title = "GO Cellular Component Analysis") +
-    theme_classic() +
-    theme(legend.position = "right")
-  
-  # Return a list of the four dotplots
-  return(list(kegg_plot = kegg_plot, bp_plot = bp_plot, mf_plot = mf_plot,
-              cc_plot = cc_plot))
-}
-```
-
-## create_dotplot function (version 2)
-
-```{r}
-create_dotplot <- function(pathways_df, kegg_df) {
-  # load required packages
-  library(enrichplot)
-  library(DOSE)
-  
-  # create dotplot for KEGG pathway data
-  kegg_top30 <- kegg_df %>% 
-    filter(p.adjust < 0.05) %>% 
-    arrange(desc(Count)) %>% 
-    head(30)
-
-  kegg_dotplot <- enrichplot::dotplot(kegg_top30$category, 
-                          -log10(kegg_top30$p.adjust), 
-                          title = "KEGG Pathways", 
-                          xlab = "-log10(Adjusted P Value)", 
-                          pch = 16, 
-                          cex = 0.8)
-
-  # create dotplots for GO pathway data
-  bp_top30 <- pathways_df %>% 
-    filter(Ontology == "Biological Process", p.adjust < 0.05) %>% 
-    arrange(desc(Count)) %>% 
-    head(30)
-
-  bp_dotplot <- enrichplot::dotplot(bp_top30$Term, 
-                        -log10(bp_top30$p.adjust), 
-                        title = "GO Biological Process", 
-                        xlab = "-log10(Adjusted P Value)", 
-                        pch = 16, 
-                        cex = 0.8)
-
-  mf_top30 <- pathways_df %>% 
-    filter(Ontology == "Molecular Function", p.adjust < 0.05) %>% 
-    arrange(desc(Count)) %>% 
-    head(30)
-
-  mf_dotplot <- enrichplot::dotplot(mf_top30$Term, 
-                        -log10(mf_top30$p.adjust), 
-                        title = "GO Molecular Function", 
-                        xlab = "-log10(Adjusted P Value)", 
-                        pch = 16, 
-                        cex = 0.8)
-
-  cc_top30 <- pathways_df %>% 
-    filter(Ontology == "Cellular Component", p.adjust < 0.05) %>% 
-    arrange(desc(Count)) %>% 
-    head(30)
-
-  cc_dotplot <- enrichplot::dotplot(cc_top30$Term, 
-                        -log10(cc_top30$p.adjust), 
-                        title = "GO Cellular Component", 
-                        xlab = "-log10(Adjusted P Value)", 
-                        pch = 16, 
-                        cex = 0.8)
-
-  # combine all dotplots into one figure
-  grid.arrange(kegg_dotplot, bp_dotplot, mf_dotplot, cc_dotplot, ncol = 2)
-}
-```
-
-You can call this function after running the `do_medium_analysis()` function for each medium condition:
-
-```{r}
-create_dotplot(medium_p27$pathways_df, medium_p27$kegg_df)
-create_dotplot(medium_p77$pathways_df, medium_p77$kegg_df)
-create_dotplot(medium_combined$pathways_df, medium_combined$kegg_df)
-```
-
-This will create four dotplots, one for each medium condition, showing the 30 most highly expressed genes in each KEGG pathway and GO ontology.
-
-## Create dotplots
-```{r}
-create_dotplot(medium_p27)
-```
-
-To use the function, simply pass the output of `do_medium_analysis`
-
-# Upregulated Receptor Analysis
-
-GOAL: Use regular expression to identify receptors upregulated in proliferation media
-
-receptor_list: https://www.ncbi.nlm.nih.gov/gene/?term=receptor%5BAll+Fields%5D+AND+%22thunnus+maccoyii%22%5Bporgn%5D+AND+alive%5Bprop%5D
-
-```{r}
-library(ggplot2)
-library(ggrepel)
-
-# Define a list of receptor genes to compare against
-receptor_list <- read.csv("thunnus_maccoyii_receptors.csv")
-  # receptor_list is populated by a list of hits on the NCBI gene database
-  # for the search "receptor" against the Thunnus Maccoyii genome.
-
-# Define 
-medium_p27_genes <- read.csv("output/dataframes/df_media_p27_genes.csv")
-
-# Extract gene_id, LFC values, and adjusted p-values for each receptor gene
-medium_p27_receptors <- medium_p27_genes %>% 
-  filter(gene_id %in% receptor_list$Symbol) %>% 
-  select(gene_id, logFC, adj.P.Val)
-
-# Filter for significantly upregulated receptors (e.g., adjusted p-value < 0.05 and logFC > 1)
-upregulated_receptors <- medium_p27_receptors %>% 
-  filter(adj.P.Val < 0.05, logFC > 1)
-
-# Filter for the top 15 upregulated receptors by their adjusted p-value
-top15_upregulated_receptors <- upregulated_receptors %>%
-  top_n(-15, adj.P.Val)
-
-# Visualize the results using a volcano plot
-ggplot(medium_p27_receptors, aes(x = logFC, y = -log10(adj.P.Val), label = gene_id)) +
-  geom_point(aes(color = ifelse(adj.P.Val < 0.05 & logFC > 1, "Upregulated", "Not upregulated")), alpha = 0.5) +
-  scale_color_manual(values = c("Upregulated" = "red", "Not upregulated" = "black")) +
-  geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "gray50") +
-  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray50") +
-  labs(x = "Log2-fold change", y = "-Log10(Adjusted P-Value)", color = "Condition") +
-  ggtitle("Volcano plot of upregulated receptors in proliferation media") +
-  theme_bw() + 
-  geom_text_repel(data = top15_upregulated_receptors, aes(label = gene_id), nudge_x = 0.5, nudge_y = 0.5)
-```
-
-```{r}
-library(ggplot2)
-library(ggrepel)
-
-# Define a list of receptor genes to compare against
-receptor_list <- read.csv("thunnus_maccoyii_receptors.csv")
-  # receptor_list is populated by a list of hits on the NCBI gene database
-  # for the search "receptor" against the Thunnus Maccoyii genome.
-
-# Define 
-medium_p77_genes <- read.csv("output/dataframes/df_media_p77_genes.csv")
-
-# Extract gene_id, LFC values, and adjusted p-values for each receptor gene
-medium_p77_receptors <- medium_p77_genes %>% 
-  filter(gene_id %in% receptor_list$Symbol) %>% 
-  select(gene_id, logFC, adj.P.Val)
-
-# Filter for significantly upregulated receptors (e.g., adjusted p-value < 0.05 and logFC > 1)
-upregulated_receptors_p77 <- medium_p77_receptors %>% 
-  filter(adj.P.Val < 0.05, logFC > 1)
-
-# Filter for the top 15 upregulated receptors by their adjusted p-value
-top15_upregulated_receptors_p77 <- upregulated_receptors_p77 %>%
-  top_n(-15, adj.P.Val)
-
-# Visualize the results using a volcano plot
-ggplot(medium_p77_receptors, aes(x = logFC, y = -log10(adj.P.Val), label = gene_id)) +
-  geom_point(aes(color = ifelse(adj.P.Val < 0.05 & logFC > 1, "Upregulated", "Not upregulated")), alpha = 0.5) +
-  scale_color_manual(values = c("Upregulated" = "red", "Not upregulated" = "black")) +
-  geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "gray50") +
-  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray50") +
-  labs(x = "Log2-fold change", y = "-Log10(Adjusted P-Value)", color = "Condition") +
-  ggtitle("Volcano plot of upregulated receptors in serum-starved media") +
-  theme_bw() + 
-  geom_text_repel(data = top15_upregulated_receptors_p77, aes(label = gene_id), nudge_x = 0.5, nudge_y = 0.5)
-```
-
-```{r}
-library(ggplot2)
-
-# Read in the data from the CSV file
-all_genes <- read.csv("output/dataframes/df_media_combined_genes.csv")
-
-# Filter for the top 15 upregulated receptors by their adjusted p-value
-top10_upregulated_genes <- all_genes %>%
-  top_n(-10, adj.P.Val)
-
-# Visualize the results using a volcano plot
-ggplot(all_genes, aes(x = logFC, y = -log10(adj.P.Val), label = gene_id)) +
-  geom_point(aes(color = ifelse(adj.P.Val < 0.05 & (logFC > 1 | logFC < -1), "Significant", "Not significant")), alpha = 0.3) +
-  scale_color_manual(values = c("Significant" = "red", "Not significant" = "black")) +
-  geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "gray50") +
-  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray50") +
-  labs(x = "Log2-fold change", y = "-Log10(Adjusted P-Value)", color = "Condition") +
-  ggtitle("Volcano plot of genes in proliferation media") +
-  theme_bw() + 
-  geom_text_repel(data = top10_upregulated_genes, aes(label = gene_id), nudge_x = 0.5, nudge_y = 0.5)
-```
