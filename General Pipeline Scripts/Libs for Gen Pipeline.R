@@ -11,3 +11,5 @@ library(vsn) # Bioconductor package
 library(ggrepel)
 library(pheatmap)
 library(ashr)
+library(stringr)
+

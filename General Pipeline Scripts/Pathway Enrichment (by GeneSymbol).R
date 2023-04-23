@@ -2,12 +2,12 @@
 # using over representation analysis
 
 # INPUTS
-  # df_DESeq_res: the data frame of the differential expression results
-  # padj_cutoff: numeric value below which a gene is counted as significant
+# df_DESeq_res: the data frame of the differential expression results
+# padj_cutoff: numeric value below which a gene is counted as significant
 
 # OUTPUTS: in list output_run_pathway
-  # go_res_tbl: table with pathway enrichment based on gene ontology
-  # kegg_res_tbl: table with pathway enrichment based on KEGG brite
+# go_res_tbl: table with pathway enrichment based on gene ontology
+# kegg_res_tbl: table with pathway enrichment based on KEGG brite
 
 run_pathway <- function(df_DESeq_res, padj_cutoff) {
   
@@ -70,4 +70,5 @@ run_pathway <- function(df_DESeq_res, padj_cutoff) {
     list(go_res_tbl = go_res_tbl, kegg_res_tbl = kegg_res_tbl)
   
   return(output_run_pathway)
+  
 }
