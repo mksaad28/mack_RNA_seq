@@ -1,0 +1,263 @@
+---
+title: "counts_analysis_v2_investigation_1"
+author: Michael, Benji, Archana, Nico
+date: April 2023
+output: html_notebook
+---
+# Background
+
+Analysis of Mack1 cell RNA Seq from passage 27 (p27) and  passage 77 (p77) cells
+comparing gene expression between p27 (before immortalization) and p77 (after
+immortalization) --> what gene expression changes allowed cells to proliferate
+out the the spontaneous immortalization crisis.
+
+Investigation Goal:
+What gene expression changes allowed cells to proliferate out of the the 
+spontaneous immortalization crisis?
+  
+Outcomes using the results of this document:
+Cross-reference genes with literature then design CRISPR KO screens.
+
+# Plans
+
+Goals of this document:
+--> Normalized counts dataframe 
+  --> PCA and ClusterMap plots in Python
+
+--> Differential expression analysis between p77 and p27
+--> A few combinations of analyses
+  - passage only -- more likely to get constitutively expressed?
+  - passage + protocol (wihtout interaction)
+  - passage_protocol (within each cell state)
+  
+  --> Volcano plot in Python
+    - sig genes diff color
+
+    
+--> Pathway expression analysis between p77 and p27
+  - padj < 0.05 
+  - GO and KEGG
+  --> Visualizations in Python: dotplot, cluste
+Make sure you're working directory is set up correctly.
+
+
+# Pipeline Scripts to Run
+```{r}
+# Libraries
+source("General Pipeline Scripts/Libs for Gen Pipeline.R")
+
+# Actual Processing
+source("General Pipeline Scripts/Eggnog_Mapping (by GeneSymbol).R")
+source("General Pipeline Scripts/Data_Wrang_and_PreProcess.R")
+
+# Functions
+source("General Pipeline Scripts/DESeq2.R")
+source("General Pipeline Scripts/GeneSymbol To GeneID.R")
+source("General Pipeline Scripts/Pathway Enrichment (by GeneSymbol).R")
+```
+
+Run run_DESeq2
+```{r}
+output_run_DESeq2_passage_only <- run_DESeq2(
+  design_arg = ~ passage,
+  contrast_arg = c("passage","p77", "p27"))
+
+output_run_DESeq2_passage_wo_int <- run_DESeq2(
+  design_arg = ~ passage + protocol, 
+  contrast_arg = c("passage","p77", "p27"))
+
+output_runDESeq2_passage_p <- run_DESeq2(
+  design_arg = ~ passage_protocol, 
+  contrast_arg = c("passage_protocol","p77_p","p27_p"))
+
+output_runDESeq2_passage_f <- run_DESeq2(
+  design_arg = ~ passage_protocol, 
+  contrast_arg = c("passage_protocol","p77_f","p27_f"))
+
+output_runDESeq2_passage_s <- run_DESeq2(
+  design_arg = ~ passage_protocol, 
+  contrast_arg = c("passage_protocol","p77_s","p27_s"))
+
+output_runDESeq2_passage_m <- run_DESeq2(
+  design_arg = ~ passage_protocol, 
+  contrast_arg = c("passage_protocol","p77_m","p27_m"))
+
+```
+
+Run run_pathway
+```{r}
+output_run_pathway_passage_only <- run_pathway(
+  df_DESeq_res = output_run_DESeq2_passage_only$df_res, padj_cutoff = 0.01)
+
+output_run_pathway_passage_wo_int <- run_pathway(
+  df_DESeq_res = output_run_DESeq2_passage_wo_int$df_res, padj_cutoff = 0.01)
+
+output_run_pathway_passage_p <- run_pathway(
+  df_DESeq_res = output_runDESeq2_passage_p$df_res, padj_cutoff = 0.01)
+
+output_run_pathway_passage_f <- run_pathway(
+  df_DESeq_res = output_runDESeq2_passage_f$df_res, padj_cutoff = 0.01)
+
+output_run_pathway_passage_s <- run_pathway(
+  df_DESeq_res = output_runDESeq2_passage_s$df_res, padj_cutoff = 0.01)
+
+output_run_pathway_passage_m <- run_pathway(
+  df_DESeq_res = output_runDESeq2_passage_m$df_res, padj_cutoff = 0.01)
+
+```
+
+```{r re-run DESeq with p27 in numerator -- will use for depletion}
+output_run_DESeq2_passage_only_dep <- run_DESeq2(
+  design_arg = ~ passage,
+  contrast_arg = c("passage","p27", "p77"))
+
+output_run_DESeq2_passage_wo_int_dep <- run_DESeq2(
+  design_arg = ~ passage + protocol, 
+  contrast_arg = c("passage","p27", "p77"))
+
+output_runDESeq2_passage_p_dep <- run_DESeq2(
+  design_arg = ~ passage_protocol, 
+  contrast_arg = c("passage_protocol","p27_p","p77_p"))
+
+output_runDESeq2_passage_f_dep <- run_DESeq2(
+  design_arg = ~ passage_protocol, 
+  contrast_arg = c("passage_protocol","p27_f","p77_f"))
+
+output_runDESeq2_passage_s_dep <- run_DESeq2(
+  design_arg = ~ passage_protocol, 
+  contrast_arg = c("passage_protocol","p27_s","p77_s"))
+
+output_runDESeq2_passage_m_dep <- run_DESeq2(
+  design_arg = ~ passage_protocol, 
+  contrast_arg = c("passage_protocol","p27_m","p77_m"))
+
+```
+
+```{r rerun pathway enrichment for depletion}
+output_run_pathway_passage_only_dep <- run_pathway(
+  df_DESeq_res = output_run_DESeq2_passage_only_dep$df_res, padj_cutoff = 0.01)
+
+output_run_pathway_passage_wo_int_dep <- run_pathway(
+  df_DESeq_res = output_run_DESeq2_passage_wo_int_dep$df_res, padj_cutoff = 0.01)
+
+output_run_pathway_passage_p_dep <- run_pathway(
+  df_DESeq_res = output_runDESeq2_passage_p_dep$df_res, padj_cutoff = 0.01)
+
+output_run_pathway_passage_f_dep <- run_pathway(
+  df_DESeq_res = output_runDESeq2_passage_f_dep$df_res, padj_cutoff = 0.01)
+
+output_run_pathway_passage_s_dep <- run_pathway(
+  df_DESeq_res = output_runDESeq2_passage_s_dep$df_res, padj_cutoff = 0.01)
+
+output_run_pathway_passage_m_dep <- run_pathway(
+  df_DESeq_res = output_runDESeq2_passage_m_dep$df_res, padj_cutoff = 0.01)
+```
+
+
+```{r Save to csv's for Python}
+# Counts dataframes
+write.csv(output_run_DESeq2_passage_only$df_counts_norm,
+          'output/dataframes/df_counts_norm.csv')
+
+write.csv(output_run_DESeq2_passage_only$df_counts_rld,
+          'output/dataframes/df_counts_rld.csv')
+
+# DESeq outputs
+
+write.csv(output_run_DESeq2_passage_only$df_res,
+          'output/dataframes/df_res_passage_only.csv')
+
+write.csv(output_run_DESeq2_passage_wo_int$df_res,
+          'output/dataframes/df_res_passage_wo_int.csv')
+
+write.csv(output_runDESeq2_passage_p$df_res,
+          'output/dataframes/df_res_passage_p.csv')
+
+write.csv(output_runDESeq2_passage_f$df_res,
+          'output/dataframes/df_res_passage_f.csv')
+
+write.csv(output_runDESeq2_passage_s$df_res,
+          'output/dataframes/df_res_passage_s.csv')
+
+write.csv(output_runDESeq2_passage_m$df_res,
+          'output/dataframes/df_res_passage_m.csv')
+
+# Pathway outputs
+
+write.csv(output_run_pathway_passage_only[1], 
+'output/dataframes/go_passage_only.csv')
+
+write.csv(output_run_pathway_passage_only[2], 
+'output/dataframes/kegg_passage_only.csv')
+
+write.csv(output_run_pathway_passage_wo_int[1], 
+'output/dataframes/go_passage_wo_int.csv')
+
+write.csv(output_run_pathway_passage_wo_int[2], 
+'output/dataframes/kegg_passage_wo_int.csv')
+
+write.csv(output_run_pathway_passage_p[1], 
+'output/dataframes/go_passage_p.csv')
+
+write.csv(output_run_pathway_passage_p[2], 
+'output/dataframes/kegg_passage_p.csv')
+
+write.csv(output_run_pathway_passage_f[1], 
+'output/dataframes/go_passage_f.csv')
+
+write.csv(output_run_pathway_passage_f[2], 
+'output/dataframes/kegg_passage_f.csv')
+
+write.csv(output_run_pathway_passage_s[1], 
+'output/dataframes/go_passage_s.csv')
+
+write.csv(output_run_pathway_passage_s[2], 
+'output/dataframes/kegg_passage_s.csv')
+
+write.csv(output_run_pathway_passage_m[1], 
+'output/dataframes/go_passage_m.csv')
+
+write.csv(output_run_pathway_passage_m[2], 
+'output/dataframes/kegg_passage_m.csv')
+
+
+# Pathway depletion outputs
+write.csv(output_run_pathway_passage_only_dep[1], 
+'output/dataframes/go_passage_only_dep.csv')
+
+write.csv(output_run_pathway_passage_only_dep[2], 
+'output/dataframes/kegg_passage_only_dep.csv')
+
+write.csv(output_run_pathway_passage_wo_int_dep[1], 
+'output/dataframes/go_passage_wo_int_dep.csv')
+
+write.csv(output_run_pathway_passage_wo_int_dep[2], 
+'output/dataframes/kegg_passage_wo_int_dep.csv')
+
+write.csv(output_run_pathway_passage_p_dep[1], 
+'output/dataframes/go_passage_p_dep.csv')
+
+write.csv(output_run_pathway_passage_p_dep[2], 
+'output/dataframes/kegg_passage_p_dep.csv')
+
+write.csv(output_run_pathway_passage_f_dep[1], 
+'output/dataframes/go_passage_f_dep.csv')
+
+write.csv(output_run_pathway_passage_f_dep[2], 
+'output/dataframes/kegg_passage_f_dep.csv')
+
+write.csv(output_run_pathway_passage_s_dep[1], 
+'output/dataframes/go_passage_s_dep.csv')
+
+write.csv(output_run_pathway_passage_s_dep[2], 
+'output/dataframes/kegg_passage_s_dep.csv')
+
+write.csv(output_run_pathway_passage_m_dep[1], 
+'output/dataframes/go_passage_m_dep.csv')
+
+write.csv(output_run_pathway_passage_m_dep[2], 
+'output/dataframes/kegg_passage_m_dep.csv')
+
+
+```
+
