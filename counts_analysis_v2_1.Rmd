@@ -119,7 +119,6 @@ term_to_gene <- eggnogg_symbol |>
   rename(GO = GOs) |>
   select(GO, gene_symbol)
 
-
 # kegg categories from yanky br08902 file.
 kegg_categories <- jsonlite::read_json("data/br08902.json") |>
   unlist() |>
@@ -264,13 +263,14 @@ expr_wide_prep <- expr_wide |>
 meta <- sample_lookup |> 
   column_to_rownames(var = "sample") |>
   select(-replicate) |>
-  mutate(passage_protocol = paste(passage,protocol, sep = '_'))
+  mutate(passage_protocol = paste(passage, protocol, sep = '_'))
 
 # FUNCTION STARTS
 run_DESeq2 <- function(design_arg, contrast_arg) {
   # Create DESeq dataset then run DESeq, which runs estimateSizeFactors,
   # estimateDispersions, and nbinomWaldTest
-  dds <- DESeqDataSetFromMatrix(countData = expr_wide_prep, colData = meta, 
+  dds <- DESeqDataSetFromMatrix(countData = expr_wide_prep, 
+                                colData = meta, 
                                 design = design_arg)
   dds <- DESeq(dds)
   
@@ -294,12 +294,16 @@ run_DESeq2 <- function(design_arg, contrast_arg) {
   
   # Shrinkage of log2 fold changes: avoid overestimates of differences between 
   # genes with high dispersion
-  res <- lfcShrink(dds,contrast=contrast_arg, res=res_unshrunken, type = 'ashr')
+  res <- lfcShrink(dds, 
+                   contrast=contrast_arg, 
+                   res=res_unshrunken, 
+                   type = 'ashr')
   df_res <- res |> as.data.frame()
 
   
   output_run_DESeq2 <- list(df_counts_norm = df_counts_norm, 
-                            df_counts_rld = df_counts_rld, df_res = df_res)
+                            df_counts_rld = df_counts_rld, 
+                            df_res = df_res)
   
   return(output_run_DESeq2)
 }
@@ -309,7 +313,8 @@ Run run_DESeq2
 ```{r}
 output_run_DESeq2_passage_p77_p27 <- run_DESeq2(design_arg = ~ passage, 
                                                 contrast_arg = c("passage", 
-                                                                 "p77", "p27"))
+                                                                 "p77", 
+                                                                 "p27"))
 # ouput_run_DESeq2_passage_protocol_p77p_P27p <- 
 #   run_DESeq2(design_arg = ~ passage_protocol, 
 #              contrast_arg = c("passage_protocol", "p77_p", "p27_p"))

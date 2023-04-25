@@ -46,6 +46,8 @@ Goals of this document:
 
 # Pipeline Scripts to Run
 ```{r}
+setwd("~/Documents/Work/Kaplan/Mack RNA Seq")
+
 # Libraries
 source("General Pipeline Scripts/Libs for Gen Pipeline.R")
 
@@ -122,6 +124,9 @@ the input csv file
 
 ```{r}
 GetUpregReceptorList <- function(df_res_GeneID) {
+  # Set working directory
+  setwd("~/Documents/Work/Kaplan/Mack RNA Seq/data")
+  
   # Load required packages
   library(dplyr)
   
@@ -130,16 +135,26 @@ GetUpregReceptorList <- function(df_res_GeneID) {
     # receptor_list is populated by a list of hits on the NCBI gene database
     # for the search "receptor" against the Thunnus Maccoyii genome.
   
-  # Extract gene_id, LFC values, and adjusted p-values for each receptor gene
-  receptors <- df_res_GeneID %>% filter(GeneID %in% receptor_list$GeneID) %>% 
-    select(GeneID, log2FoldChange, padj)
+  upreg_receptors <- df_res_GeneID %>% 
+    # Extract gene_id, LFC values, and adjusted p-values for each receptor gene.
+    filter(gene_id %in% receptor_list$GeneID) %>% 
+    select(gene_id, log2FoldChange, padj) %>% 
+    
+    # Filter for significantly upregulated receptors (e.g., adjusted 
+    # p-value < 0.01 and log2FoldChange > 1
+    filter(padj < 0.01, log2FoldChange > 1)
+    
+  # Add in metadata to receptor list and sort by log2FoldChange in 
+  # decreasing order
+  upreg_receptors_meta <- transform(upreg_receptors, 
+                                    gene_id = as.numeric(gene_id)) %>%
+    
+    rename(GeneID = gene_id) %>%
+    left_join(receptor_list, by = 'GeneID') %>%
+    arrange(desc(log2FoldChange))
   
-  # Filter for significantly upregulated receptors 
-    # (e.g., adjusted p-value < 0.05 and logFC > 1)
-  upreg_receptors <- receptors %>% filter(padj < 0.01, log2FoldChange > 1)
-  
-  # Return the top 15 upregulated receptors
-  return(upreg_receptors)
+  # Return upregulated receptors list with metadata
+  return(upreg_receptors_meta)
 }
 ```
 
@@ -292,5 +307,11 @@ create_heatmap <- function(expr_data) {
 
 ```{r}
 create_heatmap(expr_wide)
+```
+
+
+#Bar Plots
+```{r}
+
 ```
 

@@ -62,7 +62,7 @@ for (line in a) {
 #' Then we read the eggnogg mapper excel file resulting from querying it with
 #' GCF_910596095.1/cds_from_genomic.fna and the default settings on
 #' http://eggnog-mapper.embl.de
-eggnogg <- readxl::read_xlsx("data/michael_saad/MM_8hli8sc6.emapper.annotations.xlsx", 
+eggnogg <- readxl::read_xlsx("data/michael_saad/MM_8hli8sc6.emapper.annotations.xlsx",
                              skip = 2) |>
   left_join(query_to_gene, by = "query") |>
   select(gene_id, everything()) |>
@@ -129,7 +129,7 @@ gene_lookup |>
   summarize(n = n()) |>
   filter(n != 1)
 
-#' # Read in the gene expression data from a TSV file, skip the first row, 
+#' Read in the gene expression data from a TSV file, skip the first row, 
 #' select all columns except Chr, Start, End, Strand, and Length, rename the 
 #' Geneid column to gene_id, pivot the data from wide to long format, and 
 #' remove the "STAR2/output/" and "Aligned.sortedByCoord.out.bam" strings 
@@ -298,7 +298,7 @@ and returns no output.
 #'                            
 #' @return Doesn't return anything, but it outputs three csv files:
 #' df_<filename>_genes.csv
-#' df_<filenam>e_pathways.csv 
+#' df_<filename>_pathways.csv 
 #' df_<filename>_kegg.csv
 #' 
 do_medium_analysis <- function(filename, reference_passage, combo = FALSE) {
@@ -336,7 +336,7 @@ do_medium_analysis <- function(filename, reference_passage, combo = FALSE) {
         )
     )
   }
-
+  
   int_keep <- filterByExpr(expr_wide |> select(-gene_id), int_design)
   # filterByExpr: Determine which genes have sufficiently large counts to be 
   # retained in a statistical analysis.
@@ -434,6 +434,11 @@ do_medium_analysis <- function(filename, reference_passage, combo = FALSE) {
                                         "pathways.csv",sep = "_"))
   write.csv(kegg_res_tbl, paste("output/dataframes/df",filename,"kegg.csv",
                                 sep = "_"))
+  
+  return(list(genes_df = int_limma_res,
+              pathways_df = int_enricher_res_tbl,
+              kegg_df = kegg_res_tbl,
+              data_long = data_long))
 }
 ```
 
