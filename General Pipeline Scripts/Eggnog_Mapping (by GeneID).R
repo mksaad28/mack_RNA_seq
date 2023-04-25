@@ -85,7 +85,7 @@ eggnogg_no_protein_id <-  eggnogg[!complete.cases(eggnogg),]
 genes_sym_no_protein <- unique(eggnogg_no_protein_id$Preferred_name)
 # 11 Preferred names with no protein ID. I don't think we lose much here.
 
-eggnogg_symbol <- eggnogg |>
+eggnogg_ID <- eggnogg |>
   left_join(gene_id_symbol_protein, by = "protein_id") |>
   group_by(gene_id) |>
   slice_head(n = 1)
@@ -96,7 +96,7 @@ eggnogg_symbol <- eggnogg |>
 #' accurate mapping?
 
 # Break the eggnogg results into long format
-term_to_brite <- eggnogg_symbol |>
+term_to_brite <- eggnogg_ID |>
   select(BRITE, gene_id) |>
   rename(brite = BRITE) |>
   rowwise() |>
@@ -105,7 +105,7 @@ term_to_brite <- eggnogg_symbol |>
 
 
 # get gene ontologies out of eggnogg.
-term_to_gene <- eggnogg_symbol |>
+term_to_gene <- eggnogg_ID |>
   select(GOs, gene_id) |>
   filter(GOs != "-") |>
   separate_rows(GOs, sep = ",") |>
