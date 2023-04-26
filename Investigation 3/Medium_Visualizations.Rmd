@@ -142,7 +142,7 @@ GetUpregReceptorList <- function(df_res_GeneID) {
     
     # Filter for significantly upregulated receptors (e.g., adjusted 
     # p-value < 0.01 and log2FoldChange > 1
-    filter(padj < 0.01, log2FoldChange > 1)
+    filter(padj < 0.005, log2FoldChange > 2)
     
   # Add in metadata to receptor list and sort by log2FoldChange in 
   # decreasing order
@@ -151,7 +151,7 @@ GetUpregReceptorList <- function(df_res_GeneID) {
     
     rename(GeneID = gene_id) %>%
     left_join(receptor_list, by = 'GeneID') %>%
-    arrange(desc(log2FoldChange))
+    arrange(padj)
   
   # Return upregulated receptors list with metadata
   return(upreg_receptors_meta)
@@ -159,21 +159,104 @@ GetUpregReceptorList <- function(df_res_GeneID) {
 ```
 
 ## Create lists of upregulated receptors
+
+Additionally a document will be created for analysis
 ```{r}
-# Combined genes
-Upreg_recep_pro_combo <- 
-  GetUpregReceptorList(Output_pro_combo$df_res_GeneID)
+# Lists of upregulated receptors for each condition
+  # Combined genes
+  Upreg_recep_pro_combo <- 
+    GetUpregReceptorList(Output_pro_combo$df_res_GeneID)
+  
+  Upreg_recep_pro_plus_pass_combo <-  
+    GetUpregReceptorList(Output_pro_plus_pass_combo$df_res_GeneID)
+  
+  # Variation within p77
+  Upreg_recep_pass_pro_p77 <- 
+    GetUpregReceptorList(Output_pass_pro_p77$df_res_GeneID)
+  
+  # Variation within p27
+  Upreg_recep_pass_pro_p27 <- 
+    GetUpregReceptorList(Output_pass_pro_p27$df_res_GeneID)
 
-Upreg_recep_pro_plus_pass_combo <-  
-  GetUpregReceptorList(Output_pro_plus_pass_combo$df_res_GeneID)
+  # Write as csv files for investigation
+  setwd("~/Documents/Work/Kaplan/Mack RNA Seq")
+  write_csv(Upreg_recep_pro_combo,
+            'Investigation 3/Receptor Lists/Upreg_recep_pro_combo.csv')
+  write_csv(Upreg_recep_pro_plus_pass_combo,
+            'Investigation 3/Receptor Lists/Upreg_recep_pro_plus_pass_combo.csv')
+  write_csv(Upreg_recep_pass_pro_p77,
+            'Investigation 3/Receptor Lists/Upreg_recep_pass_pro_p77.csv')
+  write_csv(Upreg_recep_pass_pro_p27,
+            'Investigation 3/Receptor Lists/Upreg_recep_pass_pro_p27.csv')
 
-# Variation within p77
-Upreg_recep_pass_pro_p77 <- 
-  GetUpregReceptorList(Output_pass_pro_p77$df_res_GeneID)
+# Document outline for investigation of top 30 DEGs (ranked by padj)
+  # Load required packages
+  library(officer)
+  library(flextable)
+  
+  # Create a new document object
+  doc <- read_docx()
+  
+  # Create a bold style
+  bold <- fp_text(bold = TRUE)
+  not_bold <- fp_text(bold = FALSE)
 
-# Variation within p27
-Upreg_recep_pass_pro_p27 <- 
-  GetUpregReceptorList(Output_pass_pro_p27$df_res_GeneID)
+  # Write document
+  for(x in 30:1) {
+    line1 <- as.character(Upreg_recep_pro_plus_pass_combo$GeneID[x])
+    line2 <- Upreg_recep_pro_plus_pass_combo$Symbol[x]
+    line3 <- Upreg_recep_pro_plus_pass_combo$description[x]
+    line4 <- Upreg_recep_pro_plus_pass_combo$other_designations[x]
+    line5 <- as.character(Upreg_recep_pro_plus_pass_combo$log2FoldChange[x])
+    line6 <- as.character(Upreg_recep_pro_plus_pass_combo$padj[x])
+    
+    if(x != 30) {
+      body_add_break(doc, pos="after")
+    }
+    
+    # Prints headers in reverse order (prints upside down for some reason)
+    
+     body_add_fpar(doc, fpar(
+      ftext("Findings: ", prop = bold), 
+      ftext("", prop = not_bold)
+    ))
+    body_add_fpar(doc, fpar(
+      ftext("", prop = not_bold) 
+    ))
+    body_add_fpar(doc, fpar(
+      ftext("", prop = not_bold) 
+    ))
+    body_add_fpar(doc, fpar(
+      ftext("PubMed Search: ", prop = bold) 
+    ))
+    body_add_fpar(doc, fpar(
+      ftext("Adjusted p-value: ", prop = bold), 
+      ftext(line6, prop = not_bold)
+    ))
+    body_add_fpar(doc, fpar(
+      ftext("log2 Fold Change: ", prop = bold), 
+      ftext(line5, prop = not_bold)
+    ))
+    body_add_fpar(doc, fpar(
+      ftext("Other designations: ", prop = bold), 
+      ftext(line4, prop = not_bold)
+    ))
+    body_add_fpar(doc, fpar(
+      ftext("Description: ", prop = bold), 
+      ftext(line3, prop = not_bold)
+    ))
+    body_add_fpar(doc, fpar(
+      ftext("Symbol: ", prop = bold), 
+      ftext(line2, prop = not_bold)
+    ))
+    body_add_fpar(doc, fpar(
+      ftext("GeneID: ", prop = bold), 
+      ftext(line1, prop = not_bold)
+    ))
+  }
+  
+  # Generate the Word document using the print function
+  print(doc, target="Upregulated Receptor Analysis.docx")
 ```
 
 # Volcano Plots
