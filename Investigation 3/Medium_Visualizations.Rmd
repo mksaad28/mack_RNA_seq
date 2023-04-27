@@ -43,6 +43,10 @@ Goals of this document:
     - sig receptors diff color
     - label receptors tested in culture
     - generate list of receptors
+    
+# Notes
+  There are multiple instances where other users will need to change the working 
+  directory to the location of the Mack RNA Seq project on their local system.
 
 # Pipeline Scripts to Run
 ```{r}
