@@ -1,0 +1,26 @@
+# To-do list for Investigation 3
+
+Compare tuna and japonicus (based on total features mapped)
+  [x] number of genes with counts > 1
+  [x] Up/downregulated genes
+  [x] Receptors
+
+[x] Setup scripts to be run by Michael
+
+TODO Decide on visualizations
+
+TODO Create/edit Roxygen2 function contracts for:
+  [ ] DESeq2
+  [ ] GID Mappings
+  [ ] createVolcanoPlot
+  [ ] createHeatmap
+  
+TODO Update file headers for:
+  [ ] Receptor Lists (Original Tuna Pipeline)
+  [ ] SJaponicusFromEggnog
+  [ ] TMaccoyiiFromEggnog
+  [ ] Enrichment Analysis Driver
+
+TODO Make sure @imports ar included in function contracts (linting)
+
+TODO Re-run Adhesion Exploration
