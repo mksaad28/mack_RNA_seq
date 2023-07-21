@@ -1,0 +1,30 @@
+Contents of Scomber japonicus Org package schema (made using the 
+makeOrgPackageFromNCBI function), that are not in AnnotationHub hosted packages:
+- entrez_genes
+
+Contents of schemas from AnnotationHub hosted packages, that are not in Scomber 
+japonicus Org package schema (made using the makeOrgPackageFromNCBI function).
+Note that these are not all in every other package:
+- chrlengths
+- chromosome_locations
+- ec
+- ensembl
+- ensembl2ncbi
+- ensembl_prot
+- ensembl_trans
+- kegg
+- ncbi2ensembl
+- sqlite_stat1
+- sqlite_stat4
+- uniprot
+- pfam
+- prosite
+- genetype
+- wormbase
+- flybase
+- flybase_cg
+- flybase_prot
+- cytogenic_locations
+- omim
+- ucsc
+- mgi
