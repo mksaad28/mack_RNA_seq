@@ -6,7 +6,6 @@ counts_analysis_v2_1.nb.html
 Random
 Mack RNA Seq.Rproj
 .DS_Store
-pathviews
 .lintr
 Archived (Benji)
 gene_info.gz 
@@ -17,3 +16,7 @@ gene2refseq.gz
 idmapping_selected.tab.gz
 NCBI.sqlite
 .vscode
+counts_analysis_v2_1.Rmd
+.Rhistory
+counts_analysis_v2_investigation_1.Rmd
+.RData
