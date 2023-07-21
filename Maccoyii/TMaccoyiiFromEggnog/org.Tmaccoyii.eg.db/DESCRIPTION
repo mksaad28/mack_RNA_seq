@@ -1,0 +1,13 @@
+Package: org.Tmaccoyii.eg.db
+Title: Genome wide annotation for Thunnus maccoyii
+Description: Genome wide annotation for Thunnus maccoyii, primarily based on mapping using Entrez Gene identifiers.
+Version: 0.1
+Author: Benjamin Bromberg <bromberg.benji@gmail.com>
+Maintainer: Benjamin Bromberg <bromberg.benji@gmail.com>
+Depends: R (>= 2.7.0), methods, AnnotationDbi (>= 1.62.2)
+Suggests: DBI, annotate, RUnit
+License: Artistic-2.0
+organism: Thunnus maccoyii
+species: Thunnus maccoyii
+biocViews: OrgDb, annotation
+
