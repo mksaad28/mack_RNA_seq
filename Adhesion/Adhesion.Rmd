@@ -1,0 +1,150 @@
+---
+title: "Cell Adhesion Molecules Investigation"
+author: "Benji Bromberg"
+output:
+  toc: TRUE
+---
+# Background
+
+
+
+# Plans
+
+
+    
+# Notes
+  There are multiple instances where other users will need to change the working 
+  directory to the location of the Mack RNA Seq project on their local system.
+
+# Pipeline Scripts to Run
+```{r}
+script_dir <- dirname(dirname(rstudioapi::getActiveDocumentContext()$path))
+setwd(script_dir)
+
+# Libraries
+source("General Pipeline Scripts/Libs for Gen Pipeline.R")
+
+# Actual Processing
+source("General Pipeline Scripts/Eggnog_Mapping (by GeneID).R")
+source("General Pipeline Scripts/Data_Wrang_and_PreProcess.R")
+
+# Functions
+source("General Pipeline Scripts/DESeq2.R")
+source("General Pipeline Scripts/GeneSymbol To GeneID.R")
+source("General Pipeline Scripts/Pathway Enrichment (by GeneSymbol).R")
+```
+
+# DESeq2 Function Calls
+```{r getResultsLists Function}
+getResultsLists <- function(design_argument, contrast_argument) {
+  tempDESEQ <- runDESeq2(
+    design_arg = design_argument,
+    contrast_arg = contrast_argument
+  )
+  tempDESEQtoID <- tempDESEQ$df_res |> add_GeneID_to_df()
+
+  results <- list(
+    df_counts_norm = tempDESEQ$df_counts_norm,
+    df_counts_rld = tempDESEQ$df_counts_rld,
+    df_res = tempDESEQ$df_res,
+    df_res_symbol = tempDESEQtoID$df_res_symbol,
+    df_res_symbol_GeneID =
+      tempDESEQtoID$df_res_symbol_GeneID,
+    df_res_GeneID = tempDESEQtoID$df_res_GeneID,
+    df_res_GeneID_for_pathway =
+      tempDESEQtoID$df_res_GeneID_for_pathway
+  )
+  return(results)
+}
+```
+
+```{r}
+# Combined genes
+desqout_pro_combo <- getResultsLists(~protocol, c("protocol", "p", "s"))
+
+desqout_pro_pass_combo <- getResultsLists(
+  ~ protocol + passage,
+  c("protocol", "p", "s")
+)
+# Variation within p77
+desqout_pass_pro_p77 <- getResultsLists(
+  ~passage_protocol,
+  c("passage_protocol", "p77_p", "p77_s")
+)
+
+# Variation within p27
+desqout_pass_pro_p27 <- getResultsLists(
+  ~passage_protocol,
+  c("passage_protocol", "p27_p", "p27_s")
+)
+```
+
+# Pathway Enrichment Function Calls
+```{r}
+# Combined genes
+Pathway_pro_combo <-
+  run_pathway(desqout_pro_combo$df_res_GeneID_for_pathway, 0.01)
+
+Pathway_pro_plus_pass_combo <-
+  run_pathway(desqout_pro_pass_combo$df_res_GeneID_for_pathway, 0.01)
+
+# Variation within p77
+Pathway_pass_pro_p77 <-
+  run_pathway(desqout_pass_pro_p77$df_res_GeneID_for_pathway, 0.01)
+
+# Variation within p27
+Pathway_pass_pro_p27 <-
+  run_pathway(desqout_pass_pro_p27$df_res_GeneID_for_pathway, 0.01)
+```
+
+# Cell Adhesion Molecule Information
+
+Link to Adhesion:
+  https://www.ncbi.nlm.nih.gov/datasets/gene/taxon/8240/?search=%22cadherin%22%20OR%20%22integrin%22%20OR%20%22selectin%22%20OR%20%22cell%20adhesion%20molecule%22%20OR%20%22CAM%22%20OR%20%22CLTD%22%20OR%20%22immunoglobulin%20super%20family%20of%20cell%20adhesion%20molecules%22%20OR%20%22IgCAM%22%20OR%20%22Superfamily%20of%20C-type%20of%20lectin-like%20domains%20proteins%22%20OR%20%22proteoglycan%22
+
+Create a list of upregulated cell adhesion molecules from the input
+tsv file
+
+Seach terms:
+"cadherin" OR "integrin" OR "selectin" OR "cell adhesion molecule" OR "CAM" OR 
+"CLTD" OR "immunoglobulin super family of cell adhesion molecules" OR "IgCAM" OR 
+"Superfamily of C-type of lectin-like domains proteins" OR "proteoglycan"
+
+```{r}
+# Set working directory
+setwd(paste0(script_dir, "/data"))
+
+# Load required packages
+library(dplyr)
+library(readr)
+
+# Define a list of receptor genes to compare against
+adhesion_list <- read_tsv("adhesion.tsv", show_col_types = FALSE)
+
+colnames(adhesion_list)[1] <- "GeneID"
+# receptor_list is populated by a list of hits on the NCBI gene database
+# for the search "receptor" against the Thunnus Maccoyii genome.
+
+upreg_adhesion <- desqout_pro_pass_combo$df_res_GeneID |>
+  # Extract gene_id, LFC values, and adjusted p-values for each receptor gene.
+  filter(gene_id %in% adhesion_list$GeneID) |>
+  select(gene_id, log2FoldChange, padj) |>
+  # Filter for significantly upregulated receptors (e.g., adjusted
+  # p-value < 0.01 and log2FoldChange > 1
+  filter(padj < 0.005, log2FoldChange > 2)
+
+# Add in metadata to receptor list and sort by log2FoldChange in
+# decreasing order
+Upreg_adhesion_pro_plus_pass_combo <- transform(upreg_adhesion,
+  gene_id = as.numeric(gene_id)
+) |>
+  rename(GeneID = gene_id) |>
+  left_join(adhesion_list, by = "GeneID") |>
+  arrange(padj)
+
+setwd(script_dir)
+write_csv(
+  Upreg_adhesion_pro_plus_pass_combo,
+  "Adhesion/Upreg_adhesion_pro_plus_pass_combo.csv"
+)
+```
